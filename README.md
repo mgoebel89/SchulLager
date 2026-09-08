@@ -262,8 +262,25 @@ wandern können.
 
 ## Hinweise für die Weiterentwicklung
 
-Homebox hat mehrere Eigenheiten, die schon einmal Zeit gekostet haben; sie sind
-in `backend/homebox.js` an Ort und Stelle kommentiert. Die wichtigste: **die
-Listenantwort ist eine Kurzfassung ohne Feldwerte.** Wer den Treffer eines
-Feld-Filters über den Feldwert nachprüft, findet nie etwas — und legt
-vorhandene Artikel ein zweites Mal an.
+Homebox hat mehrere Eigenheiten, die schon Zeit gekostet haben; sie sind in
+`backend/homebox.js` an Ort und Stelle kommentiert.
+
+**Die Listenantwort ist eine Kurzfassung ohne Feldwerte.** Wer den Treffer eines
+Feld-Filters über den Feldwert nachprüft, findet nie etwas — und legt vorhandene
+Artikel ein zweites Mal an.
+
+**Unbekannte Felder und Filter werden stillschweigend verworfen.** Ein
+Filterparameter, den der Server nicht kennt, liefert *alles* zurück; ein
+unbekanntes Feld im POST wird ignoriert, der Datensatz aber angelegt. Deshalb
+gilt in diesem Projekt: **nach jedem Schreibvorgang mit unsicherem Feld
+nachsehen, ob das Gewünschte auch eingetreten ist.** Genau das hat den
+Lagerort-Fehler aufgedeckt.
+
+**Ein Lagerort ist kein Flag, sondern ein Typ.** In der Entities-API ist ein
+Lagerort eine Entität mit einer `entityTypeId`, deren Typ `isLocation: true`
+trägt (`/v1/entity-types`). `/v1/locations` gibt es nicht mehr, und
+`isLocation` im Anlege-Aufruf bewirkt nichts.
+
+Bei Zweifeln über die API lohnt der Blick in den Quelltext:
+`raw.githubusercontent.com/sysadminsmedia/homebox` — deutlich verlässlicher als
+Ausprobieren.

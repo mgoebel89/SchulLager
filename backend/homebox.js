@@ -48,6 +48,7 @@ let cfg = { url: ENV_URL, username: ENV_USER, password: ENV_PASS, groupId: ENV_G
 let token = '';
 let tokenBis = 0;          // Zeitpunkt, ab dem neu angemeldet wird
 let apiStil = null;        // 'entities' | 'items' — einmal erkannt, dann gemerkt
+let ortTypCache = null;    // Entity-Typ mit isLocation (siehe ortTypId)
 let feldFilter = null;     // kann der Server nach Feldwerten filtern? (siehe feldFilterPruefen)
 
 function loadConfig() {
@@ -82,6 +83,8 @@ function setConfig({ url, username, password, groupId, groupName } = {}) {
   // Zugang geändert → alles neu ermitteln. Auch den Feldfilter: eine andere
   // Homebox kann eine andere Version sein.
   token = ''; tokenBis = 0; apiStil = null; feldFilter = null;
+  // Der Lagerort-Typ gehört zur Sammlung — nach einem Zugangswechsel gilt er nicht mehr.
+  ortTypCache = null;
   cacheVerwerfen();
   return publicConfig();
 }
@@ -674,8 +677,11 @@ async function nachMarke(markeName) {
 
   // 1. Serverfilter versuchen — und das Ergebnis nachprüfen.
   try {
+    // Der Parameter heißt `tags` — im Homebox-Quelltext nachgesehen
+    // (queryUUIDList(params, "tags")). `tagIds` wurde still ignoriert, womit
+    // der Serverfilter wirkungslos blieb und immer der langsame Weg lief.
     const params = stil === 'entities'
-      ? { tagIds: marke.id, pageSize: 200 }
+      ? { tags: marke.id, pageSize: 200 }
       : { labels: marke.id, pageSize: 200 };
     const { eintraege } = listeAus(await api(artikelPfad(stil), { params }));
     const artikel = eintraege.map(normArtikel);
@@ -743,17 +749,46 @@ async function markeSicherstellen(name) {
 // Lagerorte werden bisher in Homebox gepflegt. Für den Alltag ist das ein
 // Bruch: wer vor einem neuen Schrank steht, will ihn dort anlegen, wo er
 // gerade arbeitet.
-// FALLE, real aufgetreten (2026-09-08): Ein POST auf /v1/entities mit
-// `isLocation: true` wurde ANGENOMMEN — aber das Feld ignoriert. Homebox legte
-// einen ganz normalen Artikel an. Für den Nutzer sah das aus wie „nichts
-// passiert": kein Fehler, und unter den Lagerorten stand nichts. In Wahrheit
-// lag ein Artikel namens „Schrank 4" im Bestand.
+// Wie ein Lagerort in der Entities-API wirklich entsteht — nachgesehen im
+// Homebox-Quelltext (2026-09-09), nachdem zwei Vermutungen scheiterten:
 //
-// Lehre daraus, dieselbe wie beim Feld- und Tag-Filter: Ein Feld, das der
-// Server nicht kennt, wird stillschweigend verworfen. Deshalb wird hier NICHT
-// geglaubt, was der POST antwortet — es wird nachgesehen, ob der Ort wirklich
-// als Lagerort existiert. Und was fälschlich als Artikel entstand, wird wieder
-// entfernt, statt als Müll liegen zu bleiben.
+//   1. `POST /v1/locations` gibt es NICHT mehr → 404.
+//   2. `POST /v1/entities` mit `isLocation: true` wird angenommen, das Feld
+//      aber verworfen — es entsteht ein ganz normaler ARTIKEL. Für den Nutzer
+//      sah das aus wie „nichts passiert".
+//
+// Richtig ist: Ein Lagerort ist eine Entität mit einer `entityTypeId`, und
+// dieser TYP trägt das Merkmal `isLocation`. Die Typen liegen unter
+// `/v1/entity-types` (`{ id, name, isLocation, icon }`). `EntityCreate` kennt
+// die Felder name, description, parentId, quantity, entityTypeId, tagIds —
+// und kein isLocation.
+//
+// Die Nachprüfung bleibt trotzdem drin: Sie hat diesen Fehler gefunden, und
+// die nächste Homebox-Version kann wieder etwas anders machen.
+// Den Entity-Typ für Lagerorte finden — oder anlegen, wenn es keinen gibt.
+async function ortTypId() {
+  if (ortTypCache) return ortTypCache;
+
+  const liste = await api('/api/v1/entity-types').catch(() => null);
+  const typen = Array.isArray(liste) ? liste : ((liste && liste.items) || []);
+  // Bevorzugt einen, der wie ein Lagerort heißt — in einer Homebox mit
+  // mehreren Ortstypen („Raum", „Schrank") soll nicht der erstbeste gewinnen.
+  const orteTypen = typen.filter(t => t && t.isLocation);
+  const bevorzugt = orteTypen.find(t => /lagerort|location|ort|raum/i.test(String(t.name || '')));
+  const treffer = bevorzugt || orteTypen[0];
+  if (treffer) { ortTypCache = treffer.id; return ortTypCache; }
+
+  // Keiner da: einen anlegen. Ohne Ortstyp ließe sich in dieser Homebox
+  // überhaupt kein Lagerort erzeugen.
+  const neu = await api('/api/v1/entity-types', {
+    method: 'POST',
+    body: { name: 'Lagerort', isLocation: true, icon: '' },
+  });
+  if (!neu || !neu.id) throw new HomeboxError('Homebox hat keinen Lagerort-Typ angelegt.', 502);
+  ortTypCache = neu.id;
+  return ortTypCache;
+}
+
 async function ortAnlegen({ name, elternId, beschreibung }) {
   const bezeichnung = String(name || '').trim();
   if (!bezeichnung) throw new HomeboxError('Es fehlt die Bezeichnung.', 400);
@@ -761,48 +796,41 @@ async function ortAnlegen({ name, elternId, beschreibung }) {
   const stil = await stilErmitteln();
   const rumpf = { name: bezeichnung, description: beschreibung || '' };
 
-  // Der klassische Endpunkt zuerst: den kennen auch die meisten neueren
-  // Versionen noch, und er ist eindeutig. Die Entity-Varianten sind Vermutungen
-  // über die verschmolzene API und stehen deshalb dahinter.
-  const varianten = [
-    { was: 'POST /v1/locations', pfad: '/api/v1/locations', body: { ...rumpf, parentId: elternId || undefined } },
-    { was: 'POST /v1/entities (type=location)', pfad: '/api/v1/entities', body: { ...rumpf, type: 'location', parentId: elternId || undefined } },
-    { was: 'POST /v1/entities (isLocation)', pfad: '/api/v1/entities', body: { ...rumpf, isLocation: true, parentId: elternId || undefined } },
-  ];
-  if (stil === 'items') varianten.length = 1;   // alte API hat nur den einen Weg
+  let angelegt;
+  if (stil === 'entities') {
+    angelegt = await api('/api/v1/entities', {
+      method: 'POST',
+      body: {
+        ...rumpf,
+        parentId: elternId || undefined,
+        entityTypeId: await ortTypId(),
+        quantity: 1,
+      },
+    });
+  } else {
+    // Alte API: dort gibt es den eigenen Endpunkt noch.
+    angelegt = await api('/api/v1/locations', {
+      method: 'POST',
+      body: { ...rumpf, parentId: elternId || undefined },
+    });
+  }
+  if (!angelegt || !angelegt.id) throw new HomeboxError('Homebox hat keine ID für den neuen Lagerort geliefert.', 502);
 
-  const versucht = [];
-  for (const v of varianten) {
-    let angelegt = null;
-    try {
-      angelegt = await api(v.pfad, { method: 'POST', body: v.body });
-    } catch (e) {
-      versucht.push(`${v.was} → ${e.message}`);
-      continue;
-    }
-    if (!angelegt || !angelegt.id) {
-      versucht.push(`${v.was} → Antwort ohne ID`);
-      continue;
-    }
-
-    // Nachsehen statt glauben.
-    const treffer = (await orte().catch(() => [])).find(o => o.id === angelegt.id);
-    if (treffer) {
-      cacheVerwerfen();
-      return treffer;
-    }
-
-    // Angelegt, aber kein Lagerort — also ein Artikel. Wieder wegräumen,
-    // sonst sammelt sich im Bestand Müll an, den niemand zuordnen kann.
-    versucht.push(`${v.was} → angenommen, aber kein Lagerort daraus geworden`);
+  // Nachsehen statt glauben — genau das hat den Fehler oben aufgedeckt.
+  const treffer = (await orte().catch(() => [])).find(o => o.id === angelegt.id);
+  if (!treffer) {
+    // Kein Lagerort geworden, also ein Artikel. Wieder wegräumen, sonst bleibt
+    // Müll im Bestand liegen, den niemand zuordnen kann.
     await artikelLoeschen(angelegt.id).catch(() => {});
+    throw new HomeboxError(
+      'Homebox hat den Eintrag angenommen, aber es ist kein Lagerort daraus geworden — '
+      + 'der Fehlversuch wurde wieder entfernt. Bitte diese Meldung weitergeben.',
+      502,
+    );
   }
 
-  throw new HomeboxError(
-    'Homebox hat den Lagerort nicht angelegt. Versucht wurde: ' + versucht.join(' | ')
-    + '. Bitte den Lagerort vorerst in Homebox selbst anlegen — und diese Meldung weitergeben.',
-    502,
-  );
+  cacheVerwerfen();
+  return treffer;
 }
 
 // Nur für den Aufräumfall oben. Bewusst nicht exportiert: Artikel löscht diese
