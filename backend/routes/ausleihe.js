@@ -57,7 +57,7 @@ module.exports = function createAusleiheRouter(broadcast) {
   });
 
   r.post('/', (req, res) => {
-    const { artikelId, artikelName, artikelCode, menge, klasse, faelligAm, notiz } = req.body || {};
+    const { artikelId, artikelName, artikelCode, menge, klasse, faelligAm, notiz, preis } = req.body || {};
     const art = (req.body && req.body.art) === 'ausgabe' ? 'ausgabe' : 'ausleihe';
     if (!artikelId) return res.status(400).json({ error: 'Es fehlt der Artikel.' });
 
@@ -87,6 +87,10 @@ module.exports = function createAusleiheRouter(broadcast) {
       artikelName: String(artikelName || '').trim(),
       artikelCode: String(artikelCode || '').trim(),
       menge: Math.max(1, parseInt(menge, 10) || 1),
+      // Preis zum Zeitpunkt der Ausgabe MITSCHREIBEN, nicht später nachschlagen:
+      // eine Abrechnung vom Mai darf sich nicht ändern, weil im Oktober neu
+      // eingekauft wurde.
+      preis: (preis === null || preis === undefined || preis === '') ? null : Number(preis),
       benutzerId: req.benutzer.id,
       benutzerName: req.benutzer.name,
       klasse: String(klasse || '').trim(),

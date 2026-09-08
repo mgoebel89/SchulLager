@@ -575,9 +575,11 @@ async function bestandAendern(id, { delta, menge }) {
 const NACHBESTELL_TTL_MS = 60 * 1000;
 const MAX_DURCHGANG = 2000;
 let nachbestellCache = null;
+let herstellerCache = null;   // Deklaration hier, damit cacheVerwerfen() sie sicher kennt
 
 function cacheVerwerfen() {
   nachbestellCache = null;
+  herstellerCache = null;
   // Eine Änderung kann eine Marke setzen oder nehmen — der Demonstrator-Merker
   // wäre sonst bis zu einer Minute falsch.
   markeCacheVerwerfen();
@@ -717,6 +719,96 @@ async function durchgangNachMarke(name) {
   return { artikel: treffer, geprueft, unvollstaendig, markeGefunden: true };
 }
 
+// --- Marke anlegen / sicherstellen ----------------------------------------
+// Damit sich ein Demonstrator aus der Weboberfläche anlegen lässt, muss der
+// Tag notfalls entstehen. Vorhandene Schreibweise gewinnt: gibt es „Demonstrator"
+// schon, wird nicht „demonstrator" danebengelegt.
+async function markeSicherstellen(name) {
+  const wunsch = String(name || '').trim();
+  if (!wunsch) throw new HomeboxError('Es fehlt der Name der Marke.', 400);
+
+  const vorhanden = (await marken().catch(() => []))
+    .find(m => String(m.name || '').trim().toLowerCase() === wunsch.toLowerCase());
+  if (vorhanden) return vorhanden;
+
+  const stil = await stilErmitteln();
+  const pfad = stil === 'entities' ? '/api/v1/tags' : '/api/v1/labels';
+  const angelegt = await api(pfad, { method: 'POST', body: { name: wunsch, description: '' } });
+  if (!angelegt || !angelegt.id) throw new HomeboxError('Homebox hat keine ID für die neue Marke geliefert.', 502);
+  markeCacheVerwerfen();
+  return { id: angelegt.id, name: angelegt.name || wunsch };
+}
+
+// --- Lagerort anlegen -----------------------------------------------------
+// Lagerorte werden bisher in Homebox gepflegt. Für den Alltag ist das ein
+// Bruch: wer vor einem neuen Schrank steht, will ihn dort anlegen, wo er
+// gerade arbeitet.
+async function ortAnlegen({ name, elternId, beschreibung }) {
+  const bezeichnung = String(name || '').trim();
+  if (!bezeichnung) throw new HomeboxError('Es fehlt die Bezeichnung.', 400);
+
+  const stil = await stilErmitteln();
+  let angelegt;
+  if (stil === 'entities') {
+    // In der neuen API ist ein Lagerort eine Entität wie jede andere, nur mit
+    // gesetztem isLocation.
+    angelegt = await api('/api/v1/entities', {
+      method: 'POST',
+      body: {
+        name: bezeichnung,
+        description: beschreibung || '',
+        isLocation: true,
+        parentId: elternId || undefined,
+      },
+    });
+  } else {
+    angelegt = await api('/api/v1/locations', {
+      method: 'POST',
+      body: { name: bezeichnung, description: beschreibung || '', parentId: elternId || undefined },
+    });
+  }
+  if (!angelegt || !angelegt.id) throw new HomeboxError('Homebox hat keine ID für den neuen Lagerort geliefert.', 502);
+  cacheVerwerfen();
+  return normOrt(angelegt);
+}
+
+// --- Hersteller-Vorschläge ------------------------------------------------
+// Beim Anlegen soll man den Hersteller nicht jedes Mal neu tippen. Homebox
+// kennt keine Liste der benutzten Hersteller — also einmal durch den Bestand
+// und zusammenzählen. Wie die Nachbestell-Liste eine teure Abfrage, deshalb
+// derselbe Merker.
+async function hersteller() {
+  if (herstellerCache && Date.now() - herstellerCache.zeit < NACHBESTELL_TTL_MS) {
+    return herstellerCache.daten;
+  }
+  const stil = await stilErmitteln();
+  const listenPfad = artikelPfad(stil);
+  const proSeite = 100;
+  const zaehler = new Map();
+  let geprueft = 0;
+
+  for (let seite = 1; seite <= Math.ceil(MAX_DURCHGANG / proSeite); seite++) {
+    const { eintraege, gesamt } = listeAus(await api(listenPfad, { params: { page: seite, pageSize: proSeite } }));
+    if (!eintraege.length) break;
+    for (const roh of eintraege) {
+      const h = String(roh.manufacturer || '').trim();
+      if (!h) continue;
+      // Nach Kleinschreibung zusammenfassen, aber die erste gesehene
+      // Schreibweise anzeigen — „Festo" und „festo" sind derselbe Hersteller.
+      const key = h.toLowerCase();
+      const e = zaehler.get(key);
+      if (e) e.anzahl += 1; else zaehler.set(key, { name: h, anzahl: 1 });
+    }
+    geprueft += eintraege.length;
+    if (eintraege.length < proSeite || (gesamt && geprueft >= gesamt)) break;
+    if (geprueft >= MAX_DURCHGANG) break;
+  }
+
+  const daten = [...zaehler.values()].sort((a, b) => b.anzahl - a.anzahl || a.name.localeCompare(b.name, 'de'));
+  herstellerCache = { zeit: Date.now(), daten };
+  return daten;
+}
+
 // --- Anhänge --------------------------------------------------------------
 // Fotos und Datenblätter gehören an den Artikel in Homebox, nicht in unsere
 // Datenbank: sonst hätte man zwei Orte, an denen Bilder liegen können.
@@ -787,6 +879,7 @@ module.exports = {
   orte, ortHolen, marken,
   anlegen, aktualisieren, bestandAendern,
   nachbestellung, anhangHochladen, nachMarke,
+  markeSicherstellen, ortAnlegen, hersteller,
   // für Tests
   _normArtikel: normArtikel,
   _normOrt: normOrt,

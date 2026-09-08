@@ -21,6 +21,7 @@ const createAuthRouter = require('./routes/auth');
 const createBenutzerRouter = require('./routes/benutzer');
 const createLagerRouter = require('./routes/lager');
 const createAusleiheRouter = require('./routes/ausleihe');
+const createKomponentenRouter = require('./routes/komponenten');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -65,6 +66,9 @@ app.use('/api/lager', createLagerRouter());
 
 // --- Ausleihe und Defektmeldungen (nur angemeldet; regelt der Router) ---
 app.use('/api/ausleihe', createAusleiheRouter(broadcast));
+
+// --- Komponenten der Demonstratoren (Profinet-Angaben; nur angemeldet) ---
+app.use('/api/komponenten', createKomponentenRouter(broadcast));
 
 // --- App-Einstellungen ---
 // Lesen darf jeder Angemeldete (die Oberfläche braucht z. B. die Klassenliste),

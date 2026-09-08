@@ -87,6 +87,23 @@ db.exec(`
     payload       TEXT NOT NULL,
     last_modified TEXT NOT NULL
   );
+
+  -- Komponenten eines Demonstrators (SPS, HMI, Switch ...).
+  --
+  -- Sie liegen hier und nicht in Homebox, weil Homebox für Netzangaben keinen
+  -- Begriff hat und der Bestand sonst mit hunderten Einzelteilen aufgebläht
+  -- würde. Wo eine Komponente doch einzeln gezählt oder etikettiert werden
+  -- soll, trägt sie zusätzlich die ID ihres Homebox-Artikels.
+  --
+  -- ACHTUNG: Im Payload steht auf Wunsch auch ein Gerätepasswort — im
+  -- Klartext. Damit enthält jede Sicherung dieser Datenbank die Passwörter
+  -- lesbar. Siehe deploy/backup.sh.
+  CREATE TABLE IF NOT EXISTS komponenten (
+    id            TEXT PRIMARY KEY,
+    payload       TEXT NOT NULL,
+    last_modified TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_komponenten_modified ON komponenten(last_modified);
 `);
 
 function nowIso() { return new Date().toISOString(); }
@@ -246,6 +263,7 @@ function raeumeSitzungen() {
 const ausleihenStore = makePayloadStore('ausleihen');
 const defekteStore = makePayloadStore('defekte');
 const inventurenStore = makePayloadStore('inventuren');
+const komponentenStore = makePayloadStore('komponenten');
 
 module.exports = {
   DATA_DIR, ATTACH_DIR,
@@ -263,4 +281,6 @@ module.exports = {
   saveDefekt: defekteStore.save, deleteDefekt: defekteStore.delete,
   listInventuren: inventurenStore.list, getInventur: inventurenStore.get,
   saveInventur: inventurenStore.save, deleteInventur: inventurenStore.delete,
+  listKomponenten: komponentenStore.list, getKomponente: komponentenStore.get,
+  saveKomponente: komponentenStore.save, deleteKomponente: komponentenStore.delete,
 };

@@ -861,3 +861,15 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
    Knöpfe, die etwas anderes tun). */
 .leih-titel { font-weight: 600; text-decoration: none; }
 .leih-titel:hover { text-decoration: underline; }
+
+/* Abschnittsüberschrift in einem langen Dialog (Komponenten-Formular) */
+.dlg-abschnitt {
+  margin: 14px 0 2px; padding-top: 10px;
+  border-top: 1px solid var(--rand);
+  color: var(--akzent-dunkel); font-size: .95rem;
+}
+.dlg-abschnitt:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+
+/* Zeitraum-Auswahl über der Ausgabenliste */
+.ausgaben-filter { margin-bottom: 10px; }
+.ausgaben-filter .inp { flex: 0 0 auto; width: auto; }

@@ -5,7 +5,11 @@
 # von Hand aufrufen:  schullager-backup
 #
 # WICHTIG: Der ARTIKELBESTAND ist hier NICHT drin — der liegt in Homebox und
-# wird dort gesichert. Diese Sicherung allein stellt also kein Lager wieder her.
+# wird dort gesichert.
+#
+# ACHTUNG: Diese Sicherung enthält die an den Komponenten hinterlegten
+# GERÄTEPASSWÖRTER im Klartext (so entschieden). Die Dateien gehören deshalb
+# nicht auf eine offene Freigabe. Diese Sicherung allein stellt also kein Lager wieder her.
 
 set -euo pipefail
 

@@ -314,6 +314,13 @@
 
     if (a.notizen) behaelter.appendChild(karte('Notizen', el('p', {}, a.notizen)));
 
+    // Komponenten gibt es nur bei Demonstratoren — ein Widerstand hat keine
+    // SPS. Die Karte lädt selbst nach, damit die Artikelansicht nicht auf sie
+    // warten muss.
+    if (istDemo && SL.store.darfBuchen()) {
+      behaelter.appendChild(await SL.views.komponentenKarte(a, neuLaden));
+    }
+
     if (!SL.store.darfBuchen()) {
       behaelter.appendChild(karte(null, el('p', { class: 'muted' }, [
         'Zum Buchen bitte ',

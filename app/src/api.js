@@ -102,6 +102,20 @@
 
   const lagerNachbestellung = () => jsonFetch('/api/lager/nachbestellung');
   const lagerNachMarke = (name) => jsonFetch(`/api/lager/marke/${encodeURIComponent(name)}`);
+  const lagerHersteller = () => jsonFetch('/api/lager/hersteller');
+  const ortAnlegen = (o) => jsonFetch('/api/lager/orte', { method: 'POST', body: o });
+  const markeAnlegen = (name) => jsonFetch('/api/lager/marken', { method: 'POST', body: { name } });
+
+  // --- Komponenten der Demonstratoren (Profinet) ---
+  function listKomponenten(demonstratorId) {
+    const p = new URLSearchParams();
+    if (demonstratorId) p.set('demonstratorId', demonstratorId);
+    return jsonFetch('/api/komponenten' + (p.toString() ? '?' + p.toString() : ''));
+  }
+  const netzUebersicht = () => jsonFetch('/api/komponenten/netz');
+  const komponenteAnlegen = (k) => jsonFetch('/api/komponenten', { method: 'POST', body: k });
+  const komponenteSpeichern = (id, k) => jsonFetch(`/api/komponenten/${encodeURIComponent(id)}`, { method: 'PUT', body: k });
+  const komponenteLoeschen = (id) => jsonFetch(`/api/komponenten/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
   // --- Ausleihe und Defektmeldungen (eigene Datenbank, nicht Homebox) ---
   // `art` trennt Ausleihen (mit Rückgabe) von Ausgaben (Dokumentation).
@@ -183,6 +197,8 @@
     lagerConfig, putLagerConfig, lagerHealth, lagerSammlungen,
     lagerSuchen, lagerOrte, lagerOrt, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
     lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerNachMarke, lagerFoto,
+    lagerHersteller, ortAnlegen, markeAnlegen,
+    listKomponenten, netzUebersicht, komponenteAnlegen, komponenteSpeichern, komponenteLoeschen,
     listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
     listDefekte, defektMelden, defektBehoben,
     subscribe, connectWs,

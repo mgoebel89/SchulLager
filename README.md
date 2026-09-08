@@ -123,6 +123,28 @@ Demonstratoren haben einen eigenen Menüpunkt. Dort zählt anderes als in der
 Artikelsuche — ob das Gerät da ist und ob es heil ist, nicht wie viele Stück
 im Fach liegen.
 
+### Komponenten eines Demonstrators (Profinet)
+
+Viele Demonstratoren bestehen aus mehreren Geräten; die im Profinet hängenden —
+meist SPS-Baugruppen — bleiben dem Demonstrator fest zugeordnet. Erfasst werden
+**Profinet-Gerätename (NameOfStation)**, IP, Subnetz, MAC, Hersteller,
+Bestellnummer, Seriennummer, UUID, Firmware und Steckplatz.
+
+Der Gerätename steht bewusst an erster Stelle: In Profinet ist **nicht die IP**
+der führende Bezeichner, sondern der DCP-Name — über ihn findet die Steuerung
+das Gerät, und beim Gerätetausch ist genau er neu zu vergeben.
+
+Die **Netzübersicht** listet alle Netzgeräte nach IP und meldet doppelt
+vergebene IPs, MACs und Gerätenamen. Beim Speichern wird ebenfalls gewarnt,
+aber nicht blockiert: manchmal ist die Dopplung gewollt, manchmal ist sie genau
+der Fehler, den man sucht. MAC-Adressen werden vor dem Vergleich vereinheitlicht
+(`00-1B-…`, `001b…` und `00:1b:…` sind dasselbe Gerät).
+
+> **Gerätepasswörter werden im Klartext gespeichert** (so entschieden). Sie sind
+> nur angemeldet sichtbar und in der Oberfläche maskiert — aber **jede nächtliche
+> Sicherung enthält sie lesbar**. Die Sicherungsdateien gehören deshalb nicht auf
+> eine offene Freigabe.
+
 ### Ausleihe
 
 Eine Ausleihe **verändert den Bestand nicht**. Ein Demonstrator, der im
@@ -167,6 +189,9 @@ wandern können.
       Nachbestell-Liste.
 - [x] **Phase 4 — Ausleihe:** Geräte an Lehrkraft und Klasse, Rückgabedatum mit
       Fristampel, Überfälligkeitsliste, Defektmeldungen.
+- [x] **Erweiterungen aus dem Betrieb:** Demonstratoren und Lagerorte aus der
+      Weboberfläche anlegen, Hersteller-Vorschläge, Anschaffungskosten,
+      Profinet-Komponenten mit Netzübersicht, Ausgaben-PDF nach Gruppen.
 - [ ] Phase 5 — Inventur
 - [ ] Phase 6 — Beschaffung und Dokumente
 - [ ] Phase 3 — Etiketten (ans Ende geschoben; braucht die genauen

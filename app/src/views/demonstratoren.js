@@ -20,6 +20,11 @@
       SL.ui.scannerBereit()
         ? el('button', { class: 'btn', type: 'button', onclick: () => SL.views.scanStarten() }, '⌷ Scannen')
         : null,
+      // Anlegen gehört hierher: wer Demonstratoren verwaltet, sucht den Knopf
+      // nicht in der Artikelliste. `demo=1` setzt den Tag gleich mit.
+      SL.store.darfBuchen()
+        ? el('a', { class: 'btn btn-primary', href: '#/neu?demo=1' }, '+ Demonstrator')
+        : null,
     ]));
 
     const behaelter = el('div');

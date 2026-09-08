@@ -86,6 +86,24 @@ module.exports = function createLagerRouter() {
   }));
   r.get('/marken', fang(async (_req, res) => res.json(await homebox.marken())));
 
+  // Häufig benutzte Hersteller — Vorschlagsliste beim Anlegen.
+  r.get('/hersteller', auth.requireAuth, fang(async (_req, res) => {
+    res.json(await homebox.hersteller());
+  }));
+
+  // Lagerort anlegen. Bisher ging das nur in Homebox — wer vor einem neuen
+  // Schrank steht, will ihn dort anlegen, wo er gerade arbeitet.
+  r.post('/orte', auth.requireAuth, fang(async (req, res) => {
+    const { name, elternId, beschreibung } = req.body || {};
+    res.json(await homebox.ortAnlegen({ name, elternId, beschreibung }));
+  }));
+
+  // Marke anlegen bzw. sicherstellen — nötig, damit sich ein Demonstrator aus
+  // der Weboberfläche anlegen lässt, auch wenn den Tag noch niemand vergeben hat.
+  r.post('/marken', auth.requireAuth, fang(async (req, res) => {
+    res.json(await homebox.markeSicherstellen((req.body || {}).name));
+  }));
+
   r.get('/barcode/:code', fang(async (req, res) => {
     const a = await homebox.beiBarcode(req.params.code);
     if (!a) return res.status(404).json({ error: 'Kein Artikel mit diesem Barcode.' });

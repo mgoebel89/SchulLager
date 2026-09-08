@@ -14,6 +14,7 @@
     { label: 'Lager', items: [
       { path: '/artikel', label: 'Artikel', icon: 'box' },
       { path: '/demonstratoren', label: 'Demonstratoren', icon: 'geraet' },
+      { path: '/netz', label: 'Netzübersicht', icon: 'netz', angemeldet: true },
       { path: '/orte', label: 'Lagerorte', icon: 'pin' },
       { path: '/scannen', label: 'Scannen', icon: 'scan' },
       { path: '/nachbestellung', label: 'Nachbestellen', icon: 'cart', angemeldet: true },
@@ -32,6 +33,7 @@
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
     box: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
     geraet: '<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4"/>',
+    netz: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11H5v6M12 11h7v6"/>',
     pin: '<path d="M12 21s7-6.4 7-11a7 7 0 10-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
     scan: '<path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><path d="M4 12h16"/>',
     hand: '<path d="M8 13V5a1.5 1.5 0 013 0v6M11 11V4a1.5 1.5 0 013 0v7M14 11V6a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a5 5 0 01-5-5v-3l-1.5-1.5a1.5 1.5 0 012-2L8 13"/>',
@@ -192,6 +194,7 @@
     if (path === '/artikel') return SL.views.renderArtikel(mount, params);
     if (path === '/orte') return SL.views.renderOrte(mount, params);
     if (path === '/demonstratoren') return SL.views.renderDemonstratoren(mount);
+    if (path === '/netz') return SL.views.renderNetz(mount);
     if (path === '/scannen') return SL.views.renderScannen(mount);
     if (path === '/neu') return SL.views.renderNeuaufnahme(mount, params);
     if (path === '/nachbestellung') return SL.views.renderNachbestellung(mount);

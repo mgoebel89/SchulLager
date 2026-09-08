@@ -21,6 +21,14 @@
         title: 'Lagerorte neu von Homebox holen',
         onclick: async () => { SL.store.orteVergessen(); SL.app.router(); },
       }, '↻ Aktualisieren'),
+      // Neuer Schrank, neues Fach: das soll dort gehen, wo man gerade steht,
+      // und nicht nur in Homebox.
+      SL.store.darfBuchen()
+        ? el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: () => anlegenDialog(params.id || ''),
+        }, '+ Lagerort')
+        : null,
     ]));
 
     const behaelter = el('div');
@@ -77,6 +85,81 @@
     behaelter.appendChild(karte(null, [suche, baumBox]));
 
     if (params.id) behaelter.appendChild(await inhaltKarte(orte, params.id));
+  }
+
+  // Lagerort anlegen. Ist gerade einer ausgewählt, ist er als übergeordneter
+  // Ort vorbelegt — beim Anlegen steht man fast immer VOR dem Schrank, in den
+  // das neue Fach gehört.
+  function anlegenDialog(elternVorschlag) {
+    const name = SL.ui.input({ autocomplete: 'off', placeholder: 'z. B. Schrank 4 oder Fach C' });
+    const beschreibung = SL.ui.input({ autocomplete: 'off' });
+    let elternId = elternVorschlag || '';
+
+    const elternAnzeige = el('span', { class: elternId ? '' : 'muted' }, 'wird ermittelt…');
+    SL.store.orteLaden().then(orte => {
+      elternAnzeige.textContent = elternId
+        ? SL.models.ortPfad(orte, elternId)
+        : 'oberste Ebene';
+      elternAnzeige.className = elternId ? '' : 'muted';
+    }).catch(() => { elternAnzeige.textContent = elternId ? '(gewählt)' : 'oberste Ebene'; });
+
+    const elternKnopf = el('button', {
+      class: 'btn', type: 'button',
+      onclick: () => SL.ui.ortWaehlen({
+        titel: 'Übergeordneter Lagerort',
+        aktuellId: elternId,
+        onWahl: (o) => {
+          elternId = o.id;
+          elternAnzeige.textContent = o.pfad || o.name;
+          elternAnzeige.className = '';
+        },
+      }),
+    }, 'Übergeordneten Ort wählen');
+
+    const dlg = SL.ui.modal('Lagerort anlegen', [
+      SL.ui.el('label', { class: 'feld feld-breit' }, [
+        el('span', { class: 'feld-label' }, 'Bezeichnung'), name,
+      ]),
+      SL.ui.el('label', { class: 'feld feld-breit' }, [
+        el('span', { class: 'feld-label' }, 'Beschreibung'), beschreibung,
+      ]),
+      SL.ui.el('label', { class: 'feld feld-breit' }, [
+        el('span', { class: 'feld-label' }, 'Gehört zu'),
+        el('div', { class: 'wahl-zeile' }, [
+          elternKnopf,
+          elternAnzeige,
+          el('button', {
+            class: 'btn btn-sm', type: 'button',
+            onclick: () => { elternId = ''; elternAnzeige.textContent = 'oberste Ebene'; elternAnzeige.className = 'muted'; },
+          }, 'oberste Ebene'),
+        ]),
+      ]),
+      el('p', { class: 'muted' }, 'Der Lagerort wird in Homebox angelegt und ist dort ebenfalls sichtbar.'),
+    ], {
+      fuss: [
+        el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            if (!name.value.trim()) { SL.ui.toast('Bitte eine Bezeichnung angeben.'); return; }
+            try {
+              const neu = await SL.api.ortAnlegen({
+                name: name.value.trim(),
+                beschreibung: beschreibung.value.trim(),
+                elternId: elternId || undefined,
+              });
+              dlg.close();
+              SL.ui.toast('Lagerort angelegt.');
+              // Der Baum kommt aus dem Zwischenspeicher — der ist jetzt alt.
+              SL.store.orteVergessen();
+              location.hash = `#/orte?id=${encodeURIComponent(neu.id)}`;
+              SL.app.router();
+            } catch (e) { SL.ui.toast(e.message || 'Das hat nicht geklappt.', 5000); }
+          },
+        }, 'Anlegen'),
+      ],
+    });
+    setTimeout(() => name.focus(), 50);
   }
 
   // Beim Filtern müssen die Elternorte mitkommen, sonst hängt ein Treffer

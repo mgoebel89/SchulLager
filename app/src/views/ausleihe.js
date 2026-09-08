@@ -136,6 +136,43 @@
     }
 
     ausgaben.sort((a, b) => String(b.ausgeliehenAm).localeCompare(String(a.ausgeliehenAm)));
+
+    // Zeitraum wählen und drucken. Voreingestellt ist das laufende Schuljahr:
+    // danach wird in der Praxis abgerechnet, nicht nach Kalenderjahr.
+    const von = input({ type: 'date', value: schuljahrStart() });
+    const bis = input({ type: 'date', value: SL.models.heuteIso() });
+    const anzahl = el('span', { class: 'muted' });
+
+    const gefiltert = () => ausgaben.filter(a => {
+      const tag = String(a.ausgeliehenAm).slice(0, 10);
+      if (von.value && tag < von.value) return false;
+      if (bis.value && tag > bis.value) return false;
+      return true;
+    });
+    const zaehlen = () => {
+      const n = gefiltert().length;
+      anzahl.textContent = `${n} ${n === 1 ? 'Buchung' : 'Buchungen'} im Zeitraum`;
+    };
+    von.addEventListener('change', zaehlen);
+    bis.addEventListener('change', zaehlen);
+    zaehlen();
+
+    box.appendChild(el('div', { class: 'wahl-zeile ausgaben-filter' }, [
+      el('span', { class: 'feld-label' }, 'von'), von,
+      el('span', { class: 'feld-label' }, 'bis'), bis,
+      anzahl,
+      el('button', {
+        class: 'btn btn-primary btn-sm', type: 'button',
+        onclick: () => {
+          const teil = gefiltert();
+          if (!teil.length) { toast('Im gewählten Zeitraum gibt es keine Ausgaben.', 3500); return; }
+          try {
+            SL.export.ausgabenPdf.bauen(teil, { von: von.value, bis: bis.value });
+          } catch (e) { toast(e.message || 'Das PDF ließ sich nicht erzeugen.', 5000); }
+        },
+      }, '📄 PDF nach Gruppen'),
+    ]));
+
     const liste = el('div', { class: 'liste' });
     for (const a of ausgaben.slice(0, 100)) {
       liste.appendChild(el('a', { class: 'eintrag eintrag-klick', href: `#/artikel?id=${encodeURIComponent(a.artikelId)}` }, [
@@ -156,6 +193,14 @@
       box.appendChild(el('p', { class: 'muted' }, `${ausgaben.length} Einträge — die 100 jüngsten sind gezeigt.`));
     }
     return karte(null, details);
+  }
+
+  // Beginn des laufenden Schuljahres (1. August). Vor August gehört man noch
+  // zum Schuljahr, das im Vorjahr begonnen hat.
+  function schuljahrStart() {
+    const heute = new Date();
+    const jahr = heute.getMonth() >= 7 ? heute.getFullYear() : heute.getFullYear() - 1;
+    return `${jahr}-08-01`;
   }
 
   // Gerät auswählen und ausleihen.
@@ -379,6 +424,8 @@
                 menge: n,
                 klasse: klassen.length ? klasse : klassenFeld.value.trim(),
                 notiz: notiz.value.trim(),
+                // Schnappschuss des Preises — siehe Kommentar im Backend.
+                preis: artikel.kaufpreis != null ? artikel.kaufpreis : null,
               });
               dlg.close();
               toast(`${n} ausgegeben.`);
