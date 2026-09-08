@@ -1,0 +1,34 @@
+[Unit]
+Description=Lagerverwaltung Backend (Node + SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/schullager/backend
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=DATA_DIR=/var/lib/schullager
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+# Der Homebox-Zugang gehört in /etc/schullager.env (root-only, 0600) oder — der
+# übliche Weg — in die App-Einstellungen; dann liegt er serverseitig in der
+# SQLite und nicht hier. Homebox kennt keine dauerhaften API-Tokens, deshalb
+# Benutzername und Passwort. Inhalt z. B.:
+#   HOMEBOX_URL=http://192.168.1.21:7745
+#   HOMEBOX_USER=lager@drsneuwied.de
+#   HOMEBOX_PASSWORD=xxxxxxxxxxxx
+#   HOMEBOX_GROUP_ID=<UUID der Sammlung, leer = Standard-Sammlung des Kontos>
+EnvironmentFile=-/etc/schullager.env
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/schullager
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

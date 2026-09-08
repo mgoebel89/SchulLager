@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2c5282" />
+  <title>Lagerverwaltung</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+</head>
+<body>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <img src="assets/logo.svg" alt="" class="brand-logo" onerror="this.style.display='none'" />
+        <div class="sidebar-brand">
+          <h1>Lager</h1>
+          <small>David-Roentgen-Schule</small>
+        </div>
+        <button class="sidebar-collapse" id="sidebarCollapse" title="Seitenleiste ein-/ausklappen" aria-label="Seitenleiste ein-/ausklappen">«</button>
+      </div>
+      <nav class="sidebar-nav" id="sidebarNav"><!-- von app.js aus NAV aufgebaut --></nav>
+      <div class="sidebar-foot" id="kontoLeiste"><!-- Anmeldezustand, von app.js --></div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="content-area">
+      <header class="mobile-bar">
+        <button class="menu-toggle" id="menuToggle" aria-label="Menü öffnen">☰</button>
+        <img src="assets/logo.svg" alt="" class="mobile-logo" onerror="this.style.display='none'" />
+        <span class="mobile-title">Lagerverwaltung</span>
+      </header>
+      <main id="app"></main>
+    </div>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- App-Module (klassische Scripts; Reihenfolge wichtig!) -->
+  <script src="src/models.js"></script>
+  <script src="src/api.js"></script>
+  <script src="src/store.js"></script>
+  <script src="src/ui/components.js"></script>
+  <script src="src/views/anmeldung.js"></script>
+  <script src="src/views/uebersicht.js"></script>
+  <script src="src/views/benutzer.js"></script>
+  <script src="src/views/einstellungen.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

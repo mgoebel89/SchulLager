@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lagerverwaltung">
+  <!-- Kiste mit QR-Marke: die beiden Dinge, um die sich diese App dreht. -->
+  <g fill="none" stroke="#2c5282" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M8 20 32 8l24 12v24L32 56 8 44z"/>
+    <path d="M8 20l24 12 24-12"/>
+    <path d="M32 32v24"/>
+  </g>
+  <g fill="#2c5282">
+    <rect x="36" y="34" width="4" height="4" rx="1"/>
+    <rect x="42" y="34" width="4" height="4" rx="1"/>
+    <rect x="36" y="40" width="4" height="4" rx="1"/>
+    <rect x="46" y="40" width="4" height="4" rx="1"/>
+    <rect x="42" y="44" width="4" height="4" rx="1"/>
+  </g>
+</svg>

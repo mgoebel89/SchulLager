@@ -1,0 +1,770 @@
+/* Lagerverwaltung — Designsprache UND Farben der Schwesterprojekte
+   (Gemeindeverwaltung, ImkereiApp). Alles ist von vornherein für Handy UND
+   Desktop gebaut: gescannt und gebucht wird am Regal mit dem Telefon,
+   eingerichtet und ausgewertet am Rechner. */
+
+/* Farbwerte 1:1 aus der Gemeindeverwaltung — beide Anwendungen sollen sich
+   gleich anfühlen. */
+:root {
+  --akzent: #2c5282;
+  --akzent-dunkel: #244168;
+  --akzent-hell: #4a7ab5;
+  --akzent-blass: #eef2f7;
+  --bg: #f6f7f9;
+  --flaeche: #ffffff;
+  --rand: #e3e6ea;
+  --text: #1d2129;
+  --text-schwach: #6b7280;
+  --gruen: #2f855a;
+  --rot: #c53030;
+  --orange: #b7791f;
+  --radius: 8px;
+  --schatten: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 12px rgba(0, 0, 0, .04);
+  --sidebar-breite: 244px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1 { font-size: 1.5rem; margin: 0; }
+h2 { font-size: 1.1rem; margin: 0; }
+h3 { font-size: 1rem; margin: 0; }
+a { color: var(--akzent-dunkel); }
+
+/* ---------------------------------------------------------------- Grundgerüst */
+.app-shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-breite);
+  flex: 0 0 var(--sidebar-breite);
+  background: var(--flaeche);
+  border-right: 1px solid var(--rand);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.sidebar-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--rand);
+}
+.brand-logo { width: 34px; height: 34px; flex: 0 0 auto; }
+.sidebar-brand { flex: 1; min-width: 0; }
+.sidebar-brand h1 { font-size: 1.02rem; }
+.sidebar-brand small { color: var(--text-schwach); font-size: .75rem; }
+.sidebar-collapse {
+  border: 1px solid var(--rand); background: #fff; color: var(--text-schwach);
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  flex: 0 0 auto; line-height: 1; padding: 0;
+}
+
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 10px 8px; }
+.nav-group-label {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-schwach); padding: 12px 10px 4px; font-weight: 600;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 7px;
+  color: var(--text); text-decoration: none; font-size: .92rem;
+}
+.nav-item:hover { background: var(--akzent-blass); }
+.nav-item.active { background: var(--akzent); color: #fff; }
+.nav-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; display: block; }
+.nav-spacer { margin-top: auto; padding-top: 10px; }
+
+.sidebar-foot { padding: 10px; border-top: 1px solid var(--rand); }
+.sync-status {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: var(--flaeche); border: 1px solid var(--rand); border-radius: 999px;
+  padding: 6px 12px; color: var(--text-schwach); font-size: .82rem; cursor: pointer;
+  text-align: left;
+}
+.sync-status:hover { background: var(--akzent-blass); }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; flex: 0 0 auto; }
+.sync-status--ok .sync-dot { background: var(--gruen); }
+.sync-status--syncing .sync-dot { background: var(--akzent-hell); }
+.sync-status--error .sync-dot { background: var(--rot); }
+.sync-status--unconfigured .sync-dot { background: #9ca3af; }
+
+.content-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+main {
+  padding: 20px 22px 60px;
+  max-width: 1180px;
+  width: 100%;
+}
+
+.mobile-bar { display: none; }
+
+/* eingeklappte Seitenleiste: nur Icons */
+.sidebar-collapsed .sidebar { --sidebar-breite: 58px; }
+.sidebar-collapsed .nav-label,
+.sidebar-collapsed .sidebar-brand,
+.sidebar-collapsed .nav-group-label,
+.sidebar-collapsed .sync-label { display: none; }
+.sidebar-collapsed .sidebar-collapse { transform: rotate(180deg); margin: 0 auto; }
+.sidebar-collapsed .nav-item { justify-content: center; }
+
+.backend-banner {
+  background: var(--rot); color: #fff; padding: 9px 14px;
+  font-size: .88rem; text-align: center;
+}
+
+/* --------------------------------------------------------------------- Karten */
+.card {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.card-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.card-head h2 { margin-right: auto; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.toolbar h1 { margin-right: auto; }
+
+.filterbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filterbar .inp { max-width: 240px; }
+
+.spacer { flex: 1; }
+.muted { color: var(--text-schwach); font-size: .9rem; margin: 4px 0; }
+.abschnitt { margin: 18px 0 8px; color: var(--akzent-dunkel); }
+
+/* -------------------------------------------------------------------- Knöpfe */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--flaeche); color: var(--text);
+  border: 1px solid var(--rand); border-radius: 8px;
+  padding: 8px 14px; font-size: .9rem; font-family: inherit;
+  cursor: pointer; text-decoration: none;
+  min-height: 40px; /* Daumenfläche am Handy */
+}
+.btn:hover { background: var(--akzent-blass); border-color: #cdd5df; }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn-primary { background: var(--akzent); border-color: var(--akzent); color: #fff; }
+.btn-primary:hover { background: var(--akzent-dunkel); border-color: var(--akzent-dunkel); }
+.btn-danger { color: var(--rot); border-color: #f1c6c6; }
+.btn-danger:hover { background: #fdf1f1; }
+.btn-sm { padding: 5px 10px; font-size: .84rem; min-height: 34px; }
+.btn-reihe { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+
+.link-danger {
+  background: none; border: 0; color: var(--rot);
+  cursor: pointer; font-size: .9rem; padding: 0 4px;
+}
+
+/* ----------------------------------------------------------------- Formulare */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px 16px;
+}
+.feld { display: flex; flex-direction: column; gap: 4px; }
+.feld-breit { grid-column: 1 / -1; }
+.feld-label { font-size: .8rem; color: var(--text-schwach); font-weight: 600; }
+
+.inp {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 16px; /* unter 16px zoomt iOS beim Fokus hinein */
+  font-family: inherit;
+  color: var(--text);
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+}
+.inp:focus { outline: 2px solid var(--akzent-hell); outline-offset: -1px; border-color: var(--akzent); }
+textarea.inp { resize: vertical; min-height: 70px; }
+
+.chk { width: 22px; height: 22px; accent-color: var(--akzent); }
+.inline-chk { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; }
+.jahr-zeile { display: flex; align-items: center; gap: 10px; }
+.farb-hinweis { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--text-schwach); white-space: nowrap; }
+
+/* Chips als Mehrfachauswahl */
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  background: var(--flaeche); border: 1px solid var(--rand); border-radius: 999px;
+  padding: 7px 13px; font-size: .85rem; font-family: inherit;
+  cursor: pointer; color: var(--text-schwach);
+}
+.chip:hover { border-color: var(--akzent); }
+.chip-aktiv { background: var(--akzent-blass); border-color: var(--akzent); color: var(--akzent-dunkel); font-weight: 600; }
+.chips-statisch .chip { cursor: default; }
+
+/* --------------------------------------------------------------------- Listen */
+.liste { list-style: none; margin: 0; padding: 0; }
+.liste li {
+  padding: 7px 0; border-bottom: 1px solid #eef0f3;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.liste li:last-child { border-bottom: 0; }
+.liste-num { margin: 8px 0 12px; padding-left: 22px; }
+.liste-num li { margin-bottom: 5px; }
+
+.daten { margin: 0; }
+.daten-zeile { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #eef0f3; }
+.daten-zeile:last-child { border-bottom: 0; }
+.daten dt { flex: 0 0 40%; max-width: 190px; color: var(--text-schwach); font-size: .87rem; margin: 0; }
+.daten dd { margin: 0; flex: 1; }
+
+.aufklapp { margin-top: 10px; }
+.aufklapp summary { cursor: pointer; color: var(--akzent-dunkel); font-size: .9rem; }
+
+.log {
+  background: #f6f7f9; border: 1px solid var(--rand); border-radius: 8px;
+  padding: 10px; margin-top: 12px; font-size: .82rem;
+  white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto;
+}
+.log:empty { display: none; }
+
+/* ------------------------------------------------------------------- Kacheln */
+.kachel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  gap: 14px;
+}
+.kachel {
+  background: var(--flaeche); border: 1px solid var(--rand);
+  border-radius: var(--radius); box-shadow: var(--schatten);
+  padding: 14px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.kachel:hover { border-color: var(--akzent); }
+.kachel-inaktiv { opacity: .6; }
+.kachel-kopf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kachel-kopf h3 { margin-right: auto; }
+.kachel-zahlen { display: flex; gap: 16px; margin-top: 4px; }
+.zahl { display: flex; flex-direction: column; }
+.zahl strong { font-size: 1.4rem; line-height: 1.1; }
+.zahl span { font-size: .76rem; color: var(--text-schwach); }
+.zahl-warn strong { color: var(--orange); }
+.kachel-fuss { margin-top: auto; padding-top: 8px; }
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.dash-grid .card { margin-bottom: 0; }
+
+/* Königinnen-Jahresfarbe */
+.koenigin-punkt {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, .3); flex: 0 0 auto; display: inline-block;
+}
+.koenigin-punkt-gross { width: 26px; height: 26px; }
+.koenigin-kopf { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+/* Ampeln und Marken */
+.ampel { font-size: .84rem; padding: 4px 9px; border-radius: 6px; display: inline-block; }
+.ampel-ok { background: #e8f5ee; color: #276749; }
+.ampel-bald { background: #fdf3e2; color: #975a16; }
+.ampel-faellig, .ampel-warnung { background: #fdecec; color: #9b2c2c; }
+.ampel-offen { background: #eef0f3; color: var(--text-schwach); }
+
+.tag {
+  font-size: .74rem; background: #eef0f3; color: var(--text-schwach);
+  padding: 2px 8px; border-radius: 999px;
+}
+.badge {
+  font-size: .76rem; background: var(--akzent-blass); color: var(--akzent-dunkel);
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
+.badge-warn, .badge-warnung { background: #fdf3e2; color: #975a16; }
+.badge-kritisch { background: #fdecec; color: #9b2c2c; }
+.badge-ok { background: #e8f5ee; color: #276749; }
+
+.kennzahl {
+  background: var(--akzent-blass); border-radius: 8px; padding: 10px 12px;
+  margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------- Durchsichten */
+/* Breite Tabellen scrollen in ihrem eigenen Kasten — die Seite selbst darf
+   niemals quer scrollen, sonst verliert man auf dem Handy die Navigation. */
+.tabelle-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+
+.ds-tabelle { border-collapse: collapse; width: 100%; min-width: 720px; font-size: .87rem; }
+.ds-tabelle th {
+  text-align: left; font-size: .74rem; text-transform: uppercase; letter-spacing: .03em;
+  color: var(--text-schwach); font-weight: 600;
+  padding: 6px 8px; border-bottom: 1px solid var(--rand); white-space: nowrap;
+  background: var(--akzent-blass); position: sticky; top: 0;
+}
+.ds-tabelle td { padding: 7px 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+.ds-zeile { cursor: pointer; }
+.ds-zeile:hover td { background: var(--akzent-blass); }
+/* Schwarmzellen oder Futternot: die Zeile muss auffallen, ohne zu schreien. */
+.ds-zeile-warn td { box-shadow: inset 3px 0 0 var(--rot); }
+.ds-sp-datum { white-space: nowrap; font-weight: 600; }
+.ds-sp-aktion { text-align: right; white-space: nowrap; }
+
+.ds-detailzeile td {
+  padding: 2px 8px 12px 8px; border-bottom: 1px solid var(--rand);
+  color: var(--text-schwach);
+}
+.ds-zusatz { font-size: .84rem; margin-bottom: 6px; }
+.ds-detailzeile .chips { margin-bottom: 6px; }
+.ds-detailzeile .chip { font-size: .78rem; padding: 3px 9px; }
+.ds-notiz { margin: 4px 0; white-space: pre-wrap; color: var(--text); font-size: .88rem; }
+
+.eintrag { padding: 11px 0; border-bottom: 1px solid #eef0f3; cursor: pointer; }
+.eintrag:last-child { border-bottom: 0; }
+.eintrag:hover { background: #f6f7f9; }
+.eintrag-kopf { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+
+/* Volk-Mehrfachauswahl (Behandlungen) */
+.volk-auswahl {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 7px; margin-top: 10px;
+}
+.volk-chip {
+  padding: 10px 6px; border: 1px solid var(--rand); border-radius: 8px;
+  background: var(--flaeche); font-family: inherit; font-size: .86rem;
+  cursor: pointer; min-height: 44px;
+}
+.volk-chip.aktiv { background: var(--akzent); border-color: var(--akzent-dunkel); color: #fff; }
+
+/* --------------------------------------------------------------- Honig */
+/* Eimer wiegen: Bezeichnung, brutto, tara, errechnetes Netto, Entfernen.
+   Auf dem Handy bricht die Zeile um, statt die Felder unbedienbar zu quetschen. */
+.wiegung-zeile {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto auto;
+  gap: 6px; align-items: center; margin-bottom: 7px;
+}
+.wiegung-netto { font-size: .85rem; color: var(--text-schwach); white-space: nowrap; min-width: 68px; }
+
+.bef-zeile {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 8px 0; border-bottom: 1px solid #eef0f3;
+}
+.bef-text { flex: 1; min-width: 160px; }
+.bef-menge { max-width: 110px; }
+
+@media (max-width: 560px) {
+  .wiegung-zeile { grid-template-columns: 1fr 1fr; }
+  .wiegung-zeile .wiegung-bez { grid-column: 1 / -1; }
+  .wiegung-netto { min-width: 0; }
+}
+
+/* --------------------------------------------------------------- Kasse */
+.kasse-kennzahlen {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin-bottom: 16px;
+}
+.kasse-kz {
+  background: var(--flaeche); border: 1px solid var(--rand); border-radius: var(--radius);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 2px;
+  box-shadow: var(--schatten);
+}
+.kasse-kz span { font-size: .78rem; color: var(--text-schwach); text-transform: uppercase; letter-spacing: .03em; }
+.kasse-kz strong { font-size: 1.3rem; }
+.kasse-kz-ein strong { color: var(--gruen); }
+.kasse-kz-aus strong { color: var(--rot); }
+.kasse-kz-plus { border-left: 4px solid var(--gruen); }
+.kasse-kz-minus { border-left: 4px solid var(--rot); }
+.kasse-kz-minus strong { color: var(--rot); }
+
+.ds-sp-betrag { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.betrag-plus { color: var(--gruen); }
+.betrag-minus { color: var(--rot); }
+
+/* Kategorie-Auswertung: Balken statt reiner Zahlenspalte — bei zwölf
+   Kategorien sind die Verhältnisse sonst nicht ablesbar. */
+.kat-zeile { margin-bottom: 10px; }
+.kat-kopf { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 3px; }
+.kat-name { flex: 1; min-width: 120px; }
+.kat-betrag { font-variant-numeric: tabular-nums; font-weight: 600; }
+.kat-anteil { font-size: .8rem; white-space: nowrap; }
+.kat-balken { height: 7px; background: #eef0f3; border-radius: 4px; overflow: hidden; }
+.kat-balken-fill { height: 100%; border-radius: 4px; }
+.kat-einnahme { background: var(--gruen); }
+.kat-ausgabe { background: var(--rot); }
+
+.kat-edit { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
+/* Gebindetyp: Name breit, die beiden Gewichte schmal — sonst schiebt der Name
+   die Zahlen aus dem Bild. */
+.typ-edit { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; flex-wrap: wrap; }
+.typ-edit .inp:first-child { flex: 1 1 150px; }
+.typ-edit .inp[type="number"] { width: 82px; flex: 0 0 auto; }
+.kuerzel-feld { width: 70px; flex: 0 0 auto; text-transform: uppercase; }
+
+/* Eimerliste in der Ernte: eine Zeile je Eimer, am Handy umbrechend. */
+.eimer-liste { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.eimer-zeile {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 6px 8px; border: 1px solid var(--rand); border-radius: 6px; background: #fff;
+}
+.eimer-wahl { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; flex-wrap: wrap; }
+.eimer-wahl .inp:first-child { flex: 1 1 200px; }
+.eimer-wahl .inp[type="number"] { width: 82px; flex: 0 0 auto; }
+
+/* Monatsverlauf: zwölf Spalten, auch die leeren — der Saisonverlauf ist nur
+   ablesbar, wenn tote Monate als Lücke sichtbar bleiben. */
+.monats-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; }
+.monat { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.monat-balken {
+  height: 110px; width: 100%; display: flex; align-items: flex-end;
+  justify-content: center; gap: 2px;
+}
+.monat-bar { width: 45%; min-height: 1px; border-radius: 2px 2px 0 0; }
+.monat-bar-ein { background: var(--gruen); }
+.monat-bar-aus { background: var(--rot); }
+.monat-name { font-size: .72rem; color: var(--text-schwach); }
+.monat-saldo { font-size: .7rem; font-variant-numeric: tabular-nums; }
+
+.legende { display: flex; gap: 16px; margin-bottom: 10px; font-size: .82rem; color: var(--text-schwach); }
+.legende span { display: inline-flex; align-items: center; gap: 5px; }
+.legende-punkt { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.legende-ein { background: var(--gruen); }
+.legende-aus { background: var(--rot); }
+
+/* --------------------------------------------------------------- Lager */
+.lager-barcode { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .78rem; }
+.lager-bestand { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.lager-bestand strong { font-size: 2.2rem; line-height: 1; }
+
+/* Quittung nach dem Scan: bestätigt, welcher Code gelesen wurde. */
+.scan-quittung {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;
+  padding: 6px 10px; border-radius: 6px; background: var(--akzent-blass);
+}
+.scan-quittung-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 600; }
+
+/* Stückzahl für Entnahme/Zugang: groß genug für den Daumen, mit Handschuh. */
+.anzahl-zeile { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.anzahl-feld {
+  flex: 1; text-align: center; font-size: 1.6rem; font-weight: 600;
+  min-height: 52px; max-width: 160px;
+}
+.btn-rund {
+  width: 52px; min-width: 52px; height: 52px; min-height: 52px;
+  border-radius: 50%; font-size: 1.4rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.schnellzahlen { margin-top: 8px; }
+.buchen-reihe .btn { flex: 1; min-width: 130px; min-height: 48px; font-size: 1rem; }
+
+/* --------------------------------------------------------- Etikettenbogen */
+/* Abbild des A4-Bogens: anklicken, welche Etiketten noch da sind. Die Felder
+   behalten das Seitenverhältnis des echten Etiketts, damit die Vorschau
+   erkennbar zum Bogen in der Hand passt. */
+.bogen-raster {
+  display: grid; gap: 2px; margin: 12px 0;
+  max-width: 420px; padding: 8px;
+  border: 1px solid var(--rand); border-radius: 6px; background: #fff;
+}
+.bogen-feld {
+  aspect-ratio: 45.7 / 21.2;
+  border: 1px solid #cdd5df; border-radius: 2px; padding: 0;
+  background: #fff; cursor: pointer; min-height: 0; min-width: 0;
+}
+.bogen-feld.weg {
+  background: repeating-linear-gradient(45deg, #eef0f3, #eef0f3 3px, #fff 3px, #fff 6px);
+  border-color: #e2e6ea;
+}
+.bogen-feld.bedruckt { background: var(--akzent); border-color: var(--akzent); }
+.bogen-feld:hover { outline: 2px solid var(--akzent-blass); }
+
+/* Eimer, die noch auf die Waage müssen. */
+.kachel-offen { border-left: 3px solid var(--gelb, #d69e2e); }
+
+/* Trefferzeilen, die man antippen kann. */
+.beleg-zeile.klickbar { cursor: pointer; }
+.beleg-zeile.klickbar:hover { background: var(--akzent-blass); }
+.barcode-zeile { display: flex; gap: 6px; }
+.barcode-zeile .inp { flex: 1; }
+
+/* Scanner: Vollbild, damit die Kamera groß genug ist, um einen Strichcode
+   sicher zu treffen — auf einem Briefmarken-Vorschaubild klappt das nicht. */
+.scan-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: #000; display: flex; flex-direction: column;
+}
+.scan-buehne { flex: 1; position: relative; overflow: hidden; }
+.scan-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Zielrahmen: quer und flach, weil EAN-Codes breiter als hoch sind. */
+.scan-rahmen {
+  position: absolute; left: 8%; right: 8%; top: 50%; height: 22%;
+  transform: translateY(-50%);
+  border: 2px solid rgba(255, 255, 255, .9); border-radius: 10px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .45);
+}
+.scan-status {
+  color: #fff; text-align: center; padding: 12px 16px; font-size: .95rem;
+  background: #000; min-height: 44px;
+}
+.scan-leiste {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  background: #000;
+}
+/* Welcher Erkenner arbeitet — bei „scannt nicht" die erste Frage. */
+.scan-werkzeug { color: rgba(255, 255, 255, .55); font-size: .8rem; }
+
+/* --------------------------------------------------------------- Belege */
+.beleg-suchzeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.beleg-suchzeile .inp { flex: 1; min-width: 160px; }
+.beleg-treffer { margin-top: 12px; max-height: 55vh; overflow-y: auto; }
+.beleg-zeile {
+  display: flex; gap: 10px; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid #eef0f3;
+}
+.beleg-thumb {
+  width: 42px; height: 56px; object-fit: cover; flex: 0 0 auto;
+  border: 1px solid var(--rand); border-radius: 4px; background: #fff;
+}
+.beleg-thumb-leer, .foto-thumb-pdf {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; color: var(--text-schwach);
+}
+.foto-thumb-pdf { width: 90px; height: 90px; border: 1px solid var(--rand); border-radius: 8px; }
+.beleg-titel { flex: 1; min-width: 0; }
+.beleg-pager { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 6px 0; }
+
+.doc-zeile {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 7px 0; border-bottom: 1px solid #eef0f3;
+}
+.doc-titel { flex: 1; min-width: 140px; }
+.auswahl-neu { display: flex; gap: 6px; }
+.auswahl-neu select { flex: 1; }
+
+@media (max-width: 700px) {
+  /* Zwölf Balken nebeneinander sind auf dem Handy nicht mehr lesbar —
+     zwei Reihen zu sechs Monaten schon. */
+  .monats-grid { grid-template-columns: repeat(6, 1fr); row-gap: 14px; }
+  .monat-balken { height: 80px; }
+}
+
+/* -------------------------------------------------------------------- Fotos */
+.foto-pick { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.foto-reihe { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.foto-kachel { position: relative; }
+.foto-thumb {
+  width: 90px; height: 90px; object-fit: cover;
+  border-radius: 8px; border: 1px solid var(--rand); display: block;
+}
+.foto-weg {
+  position: absolute; top: -6px; right: -6px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--rot); color: #fff; border: 0; cursor: pointer;
+  font-size: .8rem; line-height: 1;
+}
+
+/* -------------------------------------------------------------------- Reiter */
+.reiter { display: flex; gap: 4px; border-bottom: 1px solid var(--rand); margin-bottom: 16px; }
+.reiter-btn {
+  background: none; border: 0; border-bottom: 3px solid transparent;
+  padding: 10px 14px; font-family: inherit; font-size: .92rem;
+  color: var(--text-schwach); cursor: pointer;
+}
+.reiter-btn.aktiv { color: var(--akzent-dunkel); border-bottom-color: var(--akzent); font-weight: 600; }
+
+/* --------------------------------------------------------------- Einstellungen */
+.settings-layout { display: flex; gap: 20px; align-items: flex-start; }
+.settings-nav { display: flex; flex-direction: column; gap: 3px; flex: 0 0 180px; }
+.settings-nav-btn {
+  text-align: left; background: none; border: 0; border-radius: 8px;
+  padding: 9px 12px; font-family: inherit; font-size: .92rem;
+  color: var(--text-schwach); cursor: pointer;
+}
+.settings-nav-btn.aktiv { background: var(--akzent-blass); color: var(--akzent-dunkel); font-weight: 600; }
+.settings-inhalt { flex: 1; min-width: 0; }
+
+/* --------------------------------------------------------------------- Modal */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(20, 17, 12, .48);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--flaeche); border-radius: 12px;
+  width: 100%; max-width: 720px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
+}
+.modal-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--rand);
+}
+.modal-head h2 { flex: 1; }
+.modal-close {
+  background: none; border: 0; font-size: 1.2rem;
+  cursor: pointer; color: var(--text-schwach); padding: 4px 8px;
+}
+.modal-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.modal-foot {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 12px 18px; border-top: 1px solid var(--rand); background: #f6f7f9;
+  border-radius: 0 0 12px 12px;
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  background: #1d2129; color: #fff; padding: 11px 18px; border-radius: 8px;
+  font-size: .9rem; z-index: 200; box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+  max-width: 90vw; text-align: center;
+}
+
+/* ======================================================= Handy und Tablet === */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed; z-index: 90; left: 0; top: 0;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+  }
+  .nav-open .sidebar { transform: translateX(0); }
+  .sidebar-collapse { display: none; }
+
+  .sidebar-backdrop { display: none; }
+  .nav-open .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 80;
+    background: rgba(20, 17, 12, .4);
+  }
+
+  .mobile-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--flaeche); border-bottom: 1px solid var(--rand);
+    padding: 10px 14px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    position: sticky; top: 0; z-index: 60;
+  }
+  .menu-toggle {
+    border: 1px solid var(--rand); background: #fff; border-radius: 7px;
+    color: var(--text); font-size: 1.15rem; cursor: pointer; padding: 3px 9px;
+  }
+  .mobile-logo { width: 26px; height: 26px; }
+  .mobile-title { font-size: 1rem; font-weight: 600; }
+
+  main { padding: 14px 13px 70px; }
+  h1 { font-size: 1.25rem; }
+
+  .form-grid { grid-template-columns: 1fr; }
+  .kachel-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .dash-grid { grid-template-columns: 1fr; }
+
+  .daten-zeile { flex-direction: column; gap: 1px; }
+  .daten dt { flex: none; max-width: none; }
+
+  .settings-layout { flex-direction: column; }
+  .settings-nav { flex-direction: row; flex: none; overflow-x: auto; width: 100%; }
+
+  /* Vollflächiges Modal — ein langes Formular ist auf dem Handy sonst nicht
+     bedienbar, und der Rand kostet nur Platz. */
+  .modal-overlay { padding: 0; }
+  .modal {
+    max-width: none; max-height: none;
+    height: 100dvh; border-radius: 0;
+  }
+  .modal-head { padding-top: calc(14px + env(safe-area-inset-top)); }
+  .modal-foot {
+    border-radius: 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  /* Speichern/Abbrechen sollen die volle Breite teilen, nicht zusammenkleben. */
+  .modal-foot .btn { flex: 1 1 auto; justify-content: center; }
+  .modal-foot .spacer { flex: 0; }
+
+  .filterbar .inp { max-width: none; flex: 1 1 140px; }
+}
+
+@media (max-width: 420px) {
+  .kachel-grid { grid-template-columns: 1fr 1fr; }
+  .volk-auswahl { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+}
+
+/* ---------------------------------------------------------------------------
+   Anmeldung, Konto, Benutzerverwaltung — die Teile, die es in den
+   Schwesterprojekten nicht gibt, weil dort niemand sich anmelden muss.
+   --------------------------------------------------------------------------- */
+
+.anmeldung-buehne {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 6vh 0 2rem;
+}
+.anmeldung-karte {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+}
+.anmeldung-kopf h2 { margin-bottom: .25rem; }
+.anmeldung-kopf p { margin: 0; }
+.anmeldung-fuss { font-size: .9rem; margin: 0; }
+
+.anmeldung-fehler {
+  margin: 0;
+  padding: .55rem .7rem;
+  border-radius: var(--radius);
+  background: #fdecec;
+  color: var(--rot);
+  border: 1px solid #f5c6c6;
+}
+.hinweis-ok { color: var(--gruen); margin: 0; }
+
+/* Konto-Leiste am Fuß der Seitenleiste */
+.konto-name {
+  font-weight: 600;
+  margin-bottom: .4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.konto-hinweis { font-size: .82rem; margin-top: .35rem; }
+/* Eingeklappt bleibt nur der Knopf — der Name hätte keinen Platz. */
+.sidebar-collapsed .konto-name,
+.sidebar-collapsed .konto-hinweis { display: none; }
+
+.benutzer-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .2rem;
+}
+.tag-warn { background: #fdf3e3; color: var(--orange); }
+
+/* Statuszeile mit Fähnchen (Homebox-Zustand auf der Übersicht).
+   Zwei Eigenheiten von `.daten-zeile` werden hier zurückgenommen: ohne
+   align-items streckt sich das Fähnchen über die volle Zeilenhöhe, und
+   unterhalb von 900 px stellt sie auf Spalte um (dort steht sonst ein Label
+   über seinem Wert). Fähnchen und Erklärung gehören aber nebeneinander.
+   Diese Regel steht bewusst NACH der Media-Query — Media-Queries erhöhen die
+   Spezifität nicht, es entscheidet die Reihenfolge. */
+.status-zeile { align-items: center; flex-direction: row; gap: 10px; flex-wrap: wrap; }
+
+/* Kacheln sind hier echte Links (nicht wie in den Schwesterprojekten Divs mit
+   Klick-Handler) — ohne das hier unterstriche der Browser den ganzen Inhalt. */
+a.kachel { text-decoration: none; color: inherit; }
+a.kachel h3 { color: var(--akzent-dunkel); }
+a.kachel:hover { border-color: var(--akzent-hell); }
