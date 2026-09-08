@@ -82,6 +82,7 @@ function setConfig({ url, username, password, groupId, groupName } = {}) {
   // Zugang geändert → alles neu ermitteln. Auch den Feldfilter: eine andere
   // Homebox kann eine andere Version sein.
   token = ''; tokenBis = 0; apiStil = null; feldFilter = null;
+  cacheVerwerfen();
   return publicConfig();
 }
 
@@ -510,6 +511,8 @@ async function aktualisieren(id, patch) {
   }
 
   await api(pfad, { method: 'PUT', body: roh });
+  // Jede Änderung kann die Nachbestell-Liste umwerfen (Menge, Mindestbestand).
+  cacheVerwerfen();
   return holen(id);
 }
 
@@ -544,6 +547,9 @@ async function anlegen({ name, beschreibung, menge, ortId, barcode, code, mindes
   if (lieferant) nach.lieferant = lieferant;
   if (notizen) nach.notizen = notizen;
   if (Object.keys(nach).length) return aktualisieren(id, nach);
+  // Ohne Nachtrag läuft kein aktualisieren() — der Merker muss trotzdem weg,
+  // sonst fehlt ein frisch angelegter knapper Artikel in der Nachbestell-Liste.
+  cacheVerwerfen();
   return holen(id);
 }
 
@@ -555,6 +561,105 @@ async function bestandAendern(id, { delta, menge }) {
   const a = await holen(id);
   if (!a) throw new HomeboxError('Artikel nicht gefunden.', 404);
   return aktualisieren(id, { menge: Math.max(0, a.menge + (Number(delta) || 0)) });
+}
+
+// --- Nachbestell-Liste ----------------------------------------------------
+// „Was ist knapp?" kann Homebox nicht beantworten: der Mindestbestand ist ein
+// benutzerdefiniertes Feld, und danach lässt sich nicht rechnen. Also geht der
+// Server die Artikel einmal durch und vergleicht selbst.
+//
+// Das ist die teuerste Abfrage der ganzen App — deshalb ein kurzer
+// Zwischenspeicher. Er wird bei jedem Schreibvorgang verworfen, damit eine
+// Entnahme sofort in der Liste auftaucht; die 60 Sekunden fangen nur ab, dass
+// mehrere Geräte gleichzeitig dasselbe ausrechnen lassen.
+const NACHBESTELL_TTL_MS = 60 * 1000;
+const MAX_DURCHGANG = 2000;
+let nachbestellCache = null;
+
+function cacheVerwerfen() { nachbestellCache = null; }
+
+async function nachbestellung() {
+  if (nachbestellCache && Date.now() - nachbestellCache.zeit < NACHBESTELL_TTL_MS) {
+    return nachbestellCache.daten;
+  }
+  const stil = await stilErmitteln();
+  const listenPfad = artikelPfad(stil);
+  const proSeite = 100;
+  const knapp = [];
+  let geprueft = 0;
+  let unvollstaendig = false;
+
+  for (let seite = 1; seite <= Math.ceil(MAX_DURCHGANG / proSeite); seite++) {
+    const data = await api(listenPfad, { params: { page: seite, pageSize: proSeite } });
+    const { eintraege, gesamt } = listeAus(data);
+    if (!eintraege.length) break;
+
+    const artikel = eintraege.map(normArtikel);
+    // Kurzfassungen tragen keine Feldwerte — ohne die weiß niemand, ob ein
+    // Mindestbestand gesetzt ist. Dann Details in Bündeln nachladen.
+    const vollstaendig = artikel.every(a => a.vollstaendig);
+    const geprueftePosten = vollstaendig ? artikel : await detailsNachladen(artikel);
+
+    for (const a of geprueftePosten) {
+      if (a && a.mindestbestand != null && a.menge <= a.mindestbestand) knapp.push(a);
+    }
+
+    geprueft += eintraege.length;
+    if (eintraege.length < proSeite || (gesamt && geprueft >= gesamt)) break;
+    if (geprueft >= MAX_DURCHGANG) { unvollstaendig = true; break; }
+  }
+
+  // Am dringendsten zuerst: der größte Fehlbetrag zum Mindestbestand.
+  knapp.sort((a, b) => (a.menge - a.mindestbestand) - (b.menge - b.mindestbestand));
+  const daten = { artikel: knapp, geprueft, unvollstaendig, stand: new Date().toISOString() };
+  nachbestellCache = { zeit: Date.now(), daten };
+  return daten;
+}
+
+async function detailsNachladen(artikel) {
+  const out = [];
+  for (let i = 0; i < artikel.length; i += 10) {
+    const buendel = artikel.slice(i, i + 10);
+    out.push(...await Promise.all(buendel.map(a => holen(a.id).catch(() => null))));
+  }
+  return out;
+}
+
+// --- Anhänge --------------------------------------------------------------
+// Fotos und Datenblätter gehören an den Artikel in Homebox, nicht in unsere
+// Datenbank: sonst hätte man zwei Orte, an denen Bilder liegen können.
+//
+// Der Upload ist multipart, geht also NICHT über den JSON-Weg `api()`.
+async function anhangHochladen(id, { daten, dateiname, mimetype, typ = 'photo' }) {
+  const stil = await stilErmitteln();
+  const t = await tokenHolen();
+  const form = new FormData();
+  form.append('file', new Blob([daten], { type: mimetype || 'application/octet-stream' }), dateiname || 'foto.jpg');
+  form.append('type', typ);
+  form.append('name', dateiname || 'foto.jpg');
+
+  let res;
+  try {
+    res = await fetch(`${cfg.url}${artikelPfad(stil, id)}/attachments`, {
+      method: 'POST',
+      headers: {
+        Authorization: t,
+        Accept: 'application/json',
+        // KEIN Content-Type setzen — fetch muss die multipart-Grenze selbst
+        // eintragen, sonst kann der Server die Teile nicht trennen.
+        ...(cfg.groupId ? { 'X-Tenant': cfg.groupId } : {}),
+      },
+      body: form,
+    });
+  } catch (e) {
+    throw new HomeboxError(`Homebox nicht erreichbar: ${e.message}`, 502);
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new HomeboxError(`Anhang abgelehnt (Homebox ${res.status}): ${text.slice(0, 200)}`, res.status);
+  }
+  cacheVerwerfen();
+  return res.json().catch(() => ({ ok: true }));
 }
 
 async function health() {
@@ -589,6 +694,7 @@ module.exports = {
   suchen, holen, beiBarcode, beiCode, beiFeld,
   orte, ortHolen, marken,
   anlegen, aktualisieren, bestandAendern,
+  nachbestellung, anhangHochladen,
   // für Tests
   _normArtikel: normArtikel,
   _normOrt: normOrt,

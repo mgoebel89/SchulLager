@@ -71,7 +71,7 @@
       if (art === 'ort') {
         const orte = await SL.store.orteLaden();
         const o = orte.find(x => String(x.code || '').toUpperCase() === wert);
-        if (!o) { nichtGefunden(wert, 'Kein Lagerort mit dieser Kennung.'); return; }
+        if (!o) { nichtGefunden(wert, 'Kein Lagerort mit dieser Kennung.', false); return; }
         location.hash = `#/orte?id=${encodeURIComponent(o.id)}`;
         return;
       }
@@ -82,7 +82,7 @@
       if (e && e.status === 404) {
         nichtGefunden(wert, art === 'barcode'
           ? 'Zu diesem Barcode ist kein Artikel hinterlegt.'
-          : 'Zu dieser Kennung ist kein Artikel hinterlegt.');
+          : 'Zu dieser Kennung ist kein Artikel hinterlegt.', art === 'barcode');
         return;
       }
       toast((e && e.message) || 'Der Code konnte nicht nachgeschlagen werden.', 4000);
@@ -91,21 +91,29 @@
 
   // Ein unbekannter Code ist der Normalfall bei Neuware — deshalb kein
   // Fehlerton, sondern ein Angebot: nachsehen oder (ab Phase 2) neu anlegen.
-  function nichtGefunden(code, text) {
+  function nichtGefunden(code, text, istBarcode) {
     const m = SL.ui.modal('Nicht gefunden', el('div', {}, [
       el('p', {}, text),
       el('p', { class: 'muted' }, ['Gelesen: ', el('span', { class: 'lager-barcode' }, code)]),
       SL.store.darfBuchen()
-        ? el('p', { class: 'muted' }, 'Das Anlegen neuer Artikel per Scan kommt in der nächsten Ausbaustufe.')
+        ? null
         : el('p', { class: 'muted' }, 'Zum Anlegen bitte anmelden.'),
     ]), {
       fuss: [
-        el('span', { class: 'spacer' }),
         el('button', { class: 'btn', type: 'button', onclick: () => m.close() }, 'Schließen'),
+        el('span', { class: 'spacer' }),
         el('button', {
-          class: 'btn btn-primary', type: 'button',
+          class: 'btn', type: 'button',
           onclick: () => { m.close(); location.hash = `#/artikel?q=${encodeURIComponent(code)}`; },
         }, 'Danach suchen'),
+        // Der häufigste Fall bei Neuware: der Barcode ist noch nicht erfasst.
+        // Deshalb ist Anlegen der hervorgehobene Knopf, nicht die Suche.
+        SL.store.darfBuchen() && istBarcode
+          ? el('button', {
+            class: 'btn btn-primary', type: 'button',
+            onclick: () => { m.close(); location.hash = `#/neu?barcode=${encodeURIComponent(code)}`; },
+          }, 'Neu anlegen')
+          : null,
       ],
     });
   }

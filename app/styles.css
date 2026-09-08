@@ -811,3 +811,43 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
   color: var(--text-schwach); font-size: .9rem; line-height: 1;
 }
 .ort-klapp-leer { cursor: default; }
+
+/* ---------------------------------------------------------------------------
+   Phase 2: Buchen, Lagerortwahl, Neuaufnahme
+   --------------------------------------------------------------------------- */
+
+/* Buchen am Regal: Anzahl einstellen, dann entnehmen oder zurücklegen.
+   Alles bewusst groß — bedient wird das einhändig mit dem Daumen, oft mit
+   der anderen Hand voller Bauteile. */
+.buchen-stepper { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.buchen-menge {
+  width: 5.5rem; text-align: center;
+  font-size: 1.3rem; font-weight: 600;
+}
+/* Zifferntasten-Pfeile weg: sie sind winzig und stehen dem Stepper im Weg. */
+.buchen-menge::-webkit-outer-spin-button,
+.buchen-menge::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.buchen-menge { -moz-appearance: textfield; }
+.btn-rund {
+  width: 44px; height: 44px; border-radius: 50%;
+  font-size: 1.4rem; line-height: 1; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.buchen-reihe { display: flex; gap: 10px; flex-wrap: wrap; }
+.buchen-knopf { flex: 1 1 10rem; min-height: 46px; font-size: 1rem; }
+
+/* Zeile aus Knopf und Zustandsanzeige (Lagerort, Foto, Barcode+Scan) */
+.wahl-zeile { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wahl-zeile .inp { flex: 1 1 12rem; }
+
+/* Lagerortwahl */
+.ortwahl-liste { margin-top: 10px; max-height: 46vh; overflow-y: auto; }
+.ortwahl-eintrag {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  text-align: left; background: transparent; cursor: pointer;
+  border: 0; border-bottom: 1px solid var(--rand);
+  padding: 10px 6px; font: inherit; color: inherit;
+}
+.ortwahl-eintrag:hover { background: var(--akzent-blass); }
+.ortwahl-aktuell { background: var(--akzent-blass); }
+.ortwahl-pfad { flex: 1; }

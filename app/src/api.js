@@ -100,6 +100,29 @@
   const lagerSpeichern = (id, a) => jsonFetch(`/api/lager/${encodeURIComponent(id)}`, { method: 'PUT', body: a });
   const lagerBestand = (id, arg) => jsonFetch(`/api/lager/${encodeURIComponent(id)}/bestand`, { method: 'POST', body: arg });
 
+  const lagerNachbestellung = () => jsonFetch('/api/lager/nachbestellung');
+
+  // Datei-Upload läuft NICHT über jsonFetch: bei multipart muss der Browser den
+  // Content-Type samt Grenzmarke selbst setzen. Wer ihn von Hand setzt, macht
+  // die Teile für den Server unlesbar.
+  async function lagerFoto(id, datei) {
+    const fd = new FormData();
+    fd.append('foto', datei, datei.name || 'foto.jpg');
+    const res = await fetch(`/api/lager/${encodeURIComponent(id)}/foto`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Client-Id': CLIENT_ID },
+      body: fd,
+    });
+    if (!res.ok) {
+      let daten = null;
+      const txt = await res.text().catch(() => '');
+      try { daten = JSON.parse(txt); } catch (_) {}
+      throw new ApiFehler((daten && daten.error) || `Fehler ${res.status}`, res.status);
+    }
+    return res.json().catch(() => ({ ok: true }));
+  }
+
   // --- WebSocket ---
   function subscribe(fn) {
     listeners.push(fn);
@@ -143,7 +166,7 @@
     getSettings, putSettings,
     lagerConfig, putLagerConfig, lagerHealth, lagerSammlungen,
     lagerSuchen, lagerOrte, lagerOrt, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
-    lagerAnlegen, lagerSpeichern, lagerBestand,
+    lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerFoto,
     subscribe, connectWs,
   };
 })();

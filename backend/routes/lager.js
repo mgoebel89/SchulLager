@@ -16,8 +16,14 @@
 // würde „orte" als Artikel-ID gelesen.
 
 const express = require('express');
+const multer = require('multer');
 const homebox = require('../homebox');
 const auth = require('../auth');
+
+// Fotos werden nur durchgereicht, nicht abgelegt — sie landen als Anhang in
+// Homebox. Deshalb Speicher statt Platte. 8 MB reichen für ein Handyfoto, das
+// das Frontend ohnehin vorher verkleinert.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // Homebox-Fehler tragen einen sinnvollen Status (503 nicht eingerichtet,
 // 502 nicht erreichbar, 403 falsche Sammlung). Den durchreichen, statt alles
@@ -58,6 +64,13 @@ module.exports = function createLagerRouter() {
     }));
   }));
 
+  // Nachbestell-Liste. Angemeldeten vorbehalten: sie geht über den ganzen
+  // Bestand und ist die teuerste Abfrage der App — die soll nicht jeder
+  // Vorbeikommende auslösen können.
+  r.get('/nachbestellung', auth.requireAuth, fang(async (_req, res) => {
+    res.json(await homebox.nachbestellung());
+  }));
+
   r.get('/orte', fang(async (_req, res) => res.json(await homebox.orte())));
   r.get('/orte/:id', fang(async (req, res) => {
     const o = await homebox.ortHolen(req.params.id);
@@ -84,6 +97,17 @@ module.exports = function createLagerRouter() {
 
   r.put('/:id', auth.requireAuth, fang(async (req, res) => {
     res.json(await homebox.aktualisieren(req.params.id, req.body || {}));
+  }));
+
+  // Foto an einen Artikel hängen. Es geht als Anhang nach Homebox, damit
+  // Bilder nur an EINER Stelle liegen.
+  r.post('/:id/foto', auth.requireAuth, upload.single('foto'), fang(async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Es kam keine Datei an.' });
+    res.json(await homebox.anhangHochladen(req.params.id, {
+      daten: req.file.buffer,
+      dateiname: req.file.originalname || 'foto.jpg',
+      mimetype: req.file.mimetype,
+    }));
   }));
 
   r.post('/:id/bestand', auth.requireAuth, fang(async (req, res) => {

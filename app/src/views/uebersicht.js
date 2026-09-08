@@ -30,6 +30,10 @@
     kacheln.appendChild(kachel('Suchen', 'Artikel über Namen oder Barcode finden', '#/artikel', true));
     kacheln.appendChild(kachel('Scannen', 'Barcode oder QR mit der Kamera lesen', '#/scannen', true));
     kacheln.appendChild(kachel('Lagerorte', 'Räume, Schränke und Fächer durchgehen', '#/orte', true));
+    if (SL.store.darfBuchen()) {
+      kacheln.appendChild(kachel('Aufnehmen', 'Neuen Artikel anlegen, Barcode scannen', '#/neu', true));
+      kacheln.appendChild(kachel('Nachbestellen', 'Was ist unter den Mindestbestand gerutscht?', '#/nachbestellung', true));
+    }
     kacheln.appendChild(kachel('Ausleihe', 'Wer hat was — kommt in einer späteren Ausbaustufe', '', false));
     mount.appendChild(karte('Schnellzugriff', kacheln));
 

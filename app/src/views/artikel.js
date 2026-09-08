@@ -42,6 +42,9 @@
     const toolbar = el('div', { class: 'toolbar' }, [
       el('h1', {}, 'Artikel'),
       el('span', { class: 'spacer' }),
+      SL.store.darfBuchen()
+        ? el('a', { class: 'btn', href: '#/neu' }, '+ Artikel')
+        : null,
       SL.ui.scannerBereit()
         ? el('button', { class: 'btn btn-primary', type: 'button', onclick: () => SL.views.scanStarten() }, '⌷ Scannen')
         : null,
@@ -209,6 +212,14 @@
     behaelter.innerHTML = '';
     behaelter.appendChild(el('div', { class: 'toolbar' }, [el('h1', {}, a.name || '(ohne Namen)')]));
 
+    // Nach jeder Buchung den Artikel frisch holen statt lokal zu rechnen:
+    // in der Zwischenzeit kann jemand anders am selben Regal gebucht haben.
+    const neuLaden = () => SL.app.router();
+
+    // Die Buchungskarte steht vor den Stammdaten. Wer am Regal steht, will
+    // entnehmen — nicht erst an Beschreibung und Hersteller vorbeiscrollen.
+    if (SL.store.darfBuchen()) behaelter.appendChild(buchenKarte(a, neuLaden));
+
     const kopf = el('div', { class: 'artikel-kopf' }, [
       el('div', { class: 'artikel-menge' }, [
         el('span', { class: 'artikel-zahl' }, String(a.menge)),
@@ -220,9 +231,12 @@
     ]);
 
     const daten = el('dl', { class: 'daten' });
-    datenZeile(daten, 'Lagerort', pfad
+    // Nur verlinken, wenn es auch ein Ziel gibt: ein Artikel kann einen
+    // Ortsnamen ohne Ortsbezug tragen (ältere Homebox-Antworten), und ein Link
+    // auf „#/orte?id=" führte ins Leere.
+    datenZeile(daten, 'Lagerort', a.ortId && pfad
       ? el('a', { href: `#/orte?id=${encodeURIComponent(a.ortId)}` }, pfad)
-      : el('span', { class: 'muted' }, 'nicht zugeordnet'));
+      : (pfad ? el('span', {}, pfad) : el('span', { class: 'muted' }, 'nicht zugeordnet')));
     if (a.beschreibung) datenZeile(daten, 'Beschreibung', a.beschreibung);
     if (a.barcode) datenZeile(daten, 'Barcode', el('span', { class: 'lager-barcode' }, a.barcode));
     if (a.code) datenZeile(daten, 'Kennung', el('span', { class: 'lager-barcode' }, a.code));
@@ -232,7 +246,20 @@
       datenZeile(daten, 'Marken', el('span', { class: 'chips-statisch' },
         a.marken.map(m => el('span', { class: 'tag' }, m.name))));
     }
-    behaelter.appendChild(karte(null, [kopf, daten]));
+    const werkzeuge = SL.store.darfBuchen()
+      ? el('div', { class: 'btn-reihe' }, [
+        el('button', { class: 'btn btn-sm', type: 'button', onclick: () => bearbeitenDialog(a, neuLaden) }, 'Bearbeiten'),
+        el('button', { class: 'btn btn-sm', type: 'button', onclick: () => umlagern(a, neuLaden) }, 'Umlagern'),
+        SL.ui.fotoPickButtons(async (datei) => {
+          try {
+            const klein = await SL.ui.resizeImageFile(datei);
+            await SL.api.lagerFoto(a.id, klein);
+            SL.ui.toast('Foto an Homebox übergeben.');
+          } catch (e) { SL.ui.toast(e.message || 'Das Foto ging nicht durch.', 4500); }
+        }, '📷 Foto'),
+      ])
+      : null;
+    behaelter.appendChild(karte(null, [kopf, daten, werkzeuge]));
 
     // Beschaffung nur zeigen, wenn etwas drinsteht — eine Karte mit vier
     // leeren Zeilen ist schlechter als gar keine.
@@ -246,12 +273,139 @@
 
     if (a.notizen) behaelter.appendChild(karte('Notizen', el('p', {}, a.notizen)));
 
-    // Was hier später hinkommt, steht bewusst schon da: sonst sucht man beim
-    // Testen nach einem Knopf, den es noch gar nicht geben soll.
-    behaelter.appendChild(karte(null, el('p', { class: 'muted' },
-      SL.store.darfBuchen()
-        ? 'Entnahme, Rückgabe und Bearbeiten kommen in der nächsten Ausbaustufe.'
-        : 'Zum Buchen bitte anmelden.')));
+    if (!SL.store.darfBuchen()) {
+      behaelter.appendChild(karte(null, el('p', { class: 'muted' }, [
+        'Zum Buchen bitte ',
+        el('a', { href: '#/anmelden' }, 'anmelden'),
+        '.',
+      ])));
+    }
+  }
+
+  // --- Buchen --------------------------------------------------------------
+  // Die Buchungskarte steht GANZ OBEN im Detail: wer am Regal steht, will
+  // entnehmen und nicht lesen. Sie wird deshalb vor den Stammdaten eingefügt.
+  function buchenKarte(a, neuLaden) {
+    let menge = 1;
+
+    const anzeige = input({
+      class: 'inp buchen-menge', type: 'number', min: '1', value: '1',
+      inputmode: 'numeric', 'aria-label': 'Anzahl',
+    });
+    const setzen = (n) => {
+      menge = Math.max(1, n || 1);
+      anzeige.value = String(menge);
+    };
+    anzeige.addEventListener('input', () => { menge = Math.max(1, parseInt(anzeige.value, 10) || 1); });
+
+    const stepper = el('div', { class: 'buchen-stepper' }, [
+      el('button', { class: 'btn btn-rund', type: 'button', 'aria-label': 'weniger', onclick: () => setzen(menge - 1) }, '−'),
+      anzeige,
+      el('button', { class: 'btn btn-rund', type: 'button', 'aria-label': 'mehr', onclick: () => setzen(menge + 1) }, '+'),
+    ]);
+
+    const knoepfe = el('div', { class: 'buchen-reihe' }, [
+      el('button', {
+        class: 'btn btn-primary buchen-knopf', type: 'button',
+        onclick: () => buchen(a, -menge, neuLaden),
+      }, '− Entnehmen'),
+      el('button', {
+        class: 'btn buchen-knopf', type: 'button',
+        onclick: () => buchen(a, +menge, neuLaden),
+      }, '+ Zurücklegen'),
+    ]);
+
+    return karte('Buchen', [stepper, knoepfe]);
+  }
+
+  async function buchen(a, delta, neuLaden) {
+    // Mehr entnehmen als da ist, ist fast immer ein Vertipper — aber nicht
+    // immer: der Bestand kann falsch geführt sein. Deshalb nachfragen statt
+    // verbieten. Homebox kappt serverseitig ohnehin bei null.
+    if (delta < 0 && -delta > a.menge) {
+      const weiter = SL.ui.confirmDialog(
+        `Es sind nur ${a.menge} Stück verzeichnet, entnommen werden sollen ${-delta}. `
+        + 'Trotzdem buchen? Der Bestand geht dann auf 0.');
+      if (!weiter) return;
+    }
+    try {
+      const neu = await SL.api.lagerBestand(a.id, { delta });
+      toast(`${delta < 0 ? 'Entnommen' : 'Zurückgelegt'}: ${Math.abs(delta)} — Bestand jetzt ${neu.menge}.`, 3000);
+      neuLaden();
+    } catch (e) {
+      toast(e.message || 'Die Buchung hat nicht geklappt.', 4500);
+    }
+  }
+
+  // --- Bearbeiten ----------------------------------------------------------
+  function bearbeitenDialog(a, neuLaden) {
+    const name = input({ value: a.name || '' });
+    const beschreibung = SL.ui.textarea({ rows: 2 });
+    beschreibung.value = a.beschreibung || '';
+    const barcode = input({ value: a.barcode || '', autocapitalize: 'none' });
+    const mindest = input({ type: 'number', min: '0', value: a.mindestbestand != null ? String(a.mindestbestand) : '' });
+    const hersteller = input({ value: a.hersteller || '' });
+    const notizen = SL.ui.textarea({ rows: 2 });
+    notizen.value = a.notizen || '';
+
+    const dlg = SL.ui.modal('Artikel bearbeiten', [
+      feldBlock('Bezeichnung', name),
+      feldBlock('Beschreibung', beschreibung),
+      feldBlock('Barcode', barcode),
+      feldBlock('Mindestbestand (leer = keine Warnung)', mindest),
+      feldBlock('Hersteller', hersteller),
+      feldBlock('Notizen', notizen),
+      el('p', { class: 'muted' }, 'Die Angaben werden in Homebox gespeichert und sind dort ebenfalls sichtbar.'),
+    ], {
+      fuss: [
+        el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            if (!name.value.trim()) { toast('Bitte eine Bezeichnung angeben.'); return; }
+            try {
+              await SL.api.lagerSpeichern(a.id, {
+                name: name.value.trim(),
+                beschreibung: beschreibung.value,
+                barcode: barcode.value.trim(),
+                // Leeres Feld heißt „keine Warnung" — das muss als null
+                // durchgereicht werden, sonst bliebe der alte Wert stehen.
+                mindestbestand: mindest.value === '' ? null : Math.max(0, parseInt(mindest.value, 10) || 0),
+                hersteller: hersteller.value.trim(),
+                notizen: notizen.value,
+              });
+              dlg.close();
+              toast('Gespeichert.');
+              neuLaden();
+            } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.', 4500); }
+          },
+        }, 'Speichern'),
+      ],
+    });
+    setTimeout(() => name.focus(), 50);
+  }
+
+  function feldBlock(label, control) {
+    return el('label', { class: 'feld feld-breit' }, [
+      el('span', { class: 'feld-label' }, label),
+      control,
+    ]);
+  }
+
+  // --- Umlagern ------------------------------------------------------------
+  function umlagern(a, neuLaden) {
+    SL.ui.ortWaehlen({
+      titel: 'Wohin umlagern?',
+      aktuellId: a.ortId,
+      onWahl: async (ort) => {
+        if (ort.id === a.ortId) { toast('Der Artikel liegt schon dort.'); return; }
+        try {
+          await SL.api.lagerSpeichern(a.id, { ortId: ort.id });
+          toast(`Umgelagert nach ${ort.name}.`, 3000);
+          neuLaden();
+        } catch (e) { toast(e.message || 'Umlagern fehlgeschlagen.', 4500); }
+      },
+    });
   }
 
   // Zurück in die Trefferliste — mit Suchbegriff, wenn wir von dort kamen.

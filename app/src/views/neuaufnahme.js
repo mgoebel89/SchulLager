@@ -1,0 +1,142 @@
+(function () {
+  'use strict';
+  window.SL = window.SL || {};
+  SL.views = SL.views || {};
+
+  const { el, karte, input, textarea, toast } = SL.ui;
+
+  // Neuen Artikel aufnehmen.
+  //
+  // Der übliche Weg dorthin ist der Scanner: Barcode gelesen, nichts gefunden,
+  // „Neu anlegen" — deshalb kommt der Code als Parameter herein und steht
+  // schon im Feld. Der zweite Weg ist der Knopf in der Artikelliste.
+  //
+  // Bewusst KEINE Online-Produktdatenbank (so entschieden): bei Elektronik-
+  // Bauteilen liefert sie ohnehin selten etwas, und der Container bräuchte
+  // Internet.
+  function renderNeuaufnahme(mount, params = {}) {
+    if (!SL.store.darfBuchen()) {
+      mount.appendChild(karte('Anmeldung nötig', el('p', { class: 'muted' }, [
+        'Zum Anlegen bitte ',
+        el('a', { href: '#/anmelden?weiter=' + encodeURIComponent(location.hash) }, 'anmelden'),
+        '.',
+      ])));
+      return;
+    }
+
+    const zustand = { ortId: params.ortId || '', ortPfad: '', foto: null };
+
+    const name = input({ autocomplete: 'off', placeholder: 'z. B. Widerstand 10 kΩ' });
+    const menge = input({ type: 'number', min: '0', value: '1', inputmode: 'numeric' });
+    const barcode = input({ value: params.barcode || '', autocapitalize: 'none' });
+    const mindest = input({ type: 'number', min: '0', placeholder: 'leer = keine Warnung' });
+    const beschreibung = textarea({ rows: 2 });
+
+    // Lagerort
+    const ortAnzeige = el('span', { class: 'muted' }, 'nicht gewählt');
+    const ortKnopf = el('button', {
+      class: 'btn', type: 'button',
+      onclick: () => SL.ui.ortWaehlen({
+        aktuellId: zustand.ortId,
+        onWahl: (o) => {
+          zustand.ortId = o.id;
+          zustand.ortPfad = o.pfad || o.name;
+          ortAnzeige.textContent = zustand.ortPfad;
+          ortAnzeige.className = '';
+        },
+      }),
+    }, 'Lagerort wählen');
+
+    // Barcode nachträglich scannen — nützlich, wenn man den Artikel von Hand
+    // anfängt und das Etikett erst danach in die Hand nimmt.
+    const barcodeScan = SL.ui.scannerBereit()
+      ? el('button', {
+        class: 'btn btn-sm', type: 'button',
+        onclick: () => SL.ui.scannen((text) => {
+          const { art, wert } = SL.models.codeArt(text);
+          if (art === 'ort') { toast('Das ist ein Lagerort-Etikett.', 3500); return; }
+          barcode.value = wert;
+        }),
+      }, '⌷ Scannen')
+      : null;
+
+    // Foto
+    const fotoAnzeige = el('span', { class: 'muted' }, 'kein Foto');
+    const fotoWahl = SL.ui.fotoPickButtons(async (datei) => {
+      zustand.foto = await SL.ui.resizeImageFile(datei);
+      fotoAnzeige.textContent = zustand.foto.name || 'Foto gewählt';
+      fotoAnzeige.className = '';
+    });
+
+    const speichern = el('button', { class: 'btn btn-primary', type: 'button' }, 'Anlegen');
+    const abbrechen = el('a', { class: 'btn', href: '#/artikel' }, 'Abbrechen');
+
+    speichern.addEventListener('click', async () => {
+      if (!name.value.trim()) { toast('Bitte eine Bezeichnung angeben.'); name.focus(); return; }
+      speichern.disabled = true;
+      speichern.textContent = 'Wird angelegt…';
+      try {
+        const a = await SL.api.lagerAnlegen({
+          name: name.value.trim(),
+          menge: Math.max(0, parseInt(menge.value, 10) || 0),
+          ortId: zustand.ortId || undefined,
+          barcode: barcode.value.trim() || undefined,
+          mindestbestand: mindest.value === '' ? undefined : Math.max(0, parseInt(mindest.value, 10) || 0),
+          beschreibung: beschreibung.value || undefined,
+        });
+
+        // Das Foto kommt NACH dem Anlegen — es braucht die Artikel-ID. Geht es
+        // schief, bleibt der Artikel trotzdem bestehen: ihn deswegen wieder zu
+        // löschen wäre schlimmer als ein fehlendes Bild.
+        let fotoFehler = '';
+        if (zustand.foto) {
+          try {
+            await SL.api.lagerFoto(a.id, zustand.foto);
+          } catch (e) {
+            fotoFehler = e.message || 'unbekannter Fehler';
+          }
+        }
+        // Der Ortsbaum zeigt Stückzahlen je Ort — die stimmen jetzt nicht mehr.
+        SL.store.orteVergessen();
+        // EINE Meldung, und zwar die wahre. Zwei Aufrufe hintereinander gehen
+        // nicht: der zweite überschreibt den ersten, und der Nutzer erführe nie,
+        // dass sein Foto fehlt.
+        toast(fotoFehler
+          ? `Artikel angelegt — aber das Foto ging nicht durch: ${fotoFehler}`
+          : 'Artikel angelegt.', fotoFehler ? 6000 : 2200);
+        location.hash = `#/artikel?id=${encodeURIComponent(a.id)}`;
+      } catch (e) {
+        toast(e.message || 'Das Anlegen hat nicht geklappt.', 5000);
+        speichern.disabled = false;
+        speichern.textContent = 'Anlegen';
+      }
+    });
+
+    mount.appendChild(el('div', { class: 'toolbar' }, [el('h1', {}, 'Artikel aufnehmen')]));
+
+    mount.appendChild(karte(null, [
+      params.barcode
+        ? el('p', { class: 'muted' }, `Gescannter Barcode ${params.barcode} ist übernommen.`)
+        : null,
+      feld('Bezeichnung', name),
+      feld('Anzahl', menge),
+      feld('Lagerort', el('div', { class: 'wahl-zeile' }, [ortKnopf, ortAnzeige])),
+      feld('Barcode', el('div', { class: 'wahl-zeile' }, [barcode, barcodeScan])),
+      feld('Mindestbestand', mindest),
+      feld('Beschreibung', beschreibung),
+      feld('Foto', el('div', { class: 'wahl-zeile' }, [fotoWahl, fotoAnzeige])),
+      el('div', { class: 'btn-reihe' }, [speichern, abbrechen]),
+    ]));
+
+    setTimeout(() => name.focus(), 50);
+  }
+
+  function feld(label, control) {
+    return el('label', { class: 'feld feld-breit' }, [
+      el('span', { class: 'feld-label' }, label),
+      control,
+    ]);
+  }
+
+  SL.views.renderNeuaufnahme = renderNeuaufnahme;
+})();

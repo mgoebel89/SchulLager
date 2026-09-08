@@ -60,7 +60,7 @@ liegt in Homebox und wird dort gesichert.
 | | Gast (nicht angemeldet) | Lehrkraft | Administrator |
 |---|---|---|---|
 | Suchen, Artikel und Lagerort ansehen | ✓ | ✓ | ✓ |
-| Buchen, anlegen, ausleihen, Etiketten | — | ✓ | ✓ |
+| Buchen, anlegen, umlagern, Nachbestell-Liste | — | ✓ | ✓ |
 | Benutzer, Homebox-Zugang, Einstellungen | — | — | ✓ |
 
 Lesen ohne Anmeldung ist Absicht: wer den QR-Code an einem Gerät scannt, soll
@@ -82,6 +82,17 @@ app/        Vanilla-JS-Frontend, Namensraum `SL`
   src/ui/scanner.js  Kamera-Scanner (nativ + ZXing)
   vendor/         ZXing als fertige Datei; der Container braucht kein Internet
 ```
+
+### Buchen
+
+Entnahme und Rückgabe laufen **relativ** (`delta`), nicht absolut. Das ist
+Absicht: stehen zwei Leute gleichzeitig am Regal, addieren sich ihre Buchungen,
+statt dass die letzte die erste überschreibt.
+
+Der **Mindestbestand** ist ein benutzerdefiniertes Feld in Homebox. Danach
+rechnen kann Homebox nicht — die Nachbestell-Liste geht deshalb serverseitig
+einmal durch den Bestand und hält das Ergebnis 60 Sekunden vor. Jeder
+Schreibvorgang verwirft diesen Merker, damit eine Entnahme sofort auftaucht.
 
 ### Was sich scannen lässt
 
@@ -109,7 +120,9 @@ wandern können.
       Artikeldetail, Lagerortbaum, Kamera-Scanner (BarcodeDetector mit
       ZXing-Rückfall für iOS) und die QR-Kurzwege `#/a/<Kennung>` und
       `#/o/<Kennung>`.
-- [ ] Phase 2 — Buchen (Entnahme/Rückgabe, Mindestbestand, Neuaufnahme per Scan)
+- [x] **Phase 2 — Buchen:** Entnahme und Rückgabe mit Stückzahl, Bearbeiten,
+      Umlagern, Foto an den Artikel, Neuaufnahme per Scan und die
+      Nachbestell-Liste.
 - [ ] Phase 3 — Etiketten (drei Größen, PDF und Direktdruck auf Brother-Geräte)
 - [ ] Phase 4 — Ausleihe (Person und Klasse, Rückgabedatum, Defektmeldung)
 - [ ] Phase 5 — Inventur
