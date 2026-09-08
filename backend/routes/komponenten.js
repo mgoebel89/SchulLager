@@ -67,9 +67,163 @@ function konflikteFinden(neu, eigeneId) {
   }));
 }
 
-module.exports = function createKomponentenRouter(broadcast) {
+// --- CSV-Import -----------------------------------------------------------
+// Die Spaltenliste steht HIER und nur hier. Die Vorlage zum Herunterladen wird
+// daraus erzeugt, und der Import liest daraus — so können Vorlage und Einleser
+// nicht auseinanderlaufen.
+const IMPORT_SPALTEN = [
+  { schluessel: 'geraet', label: 'Geraet', pflicht: true, hinweis: 'Bezeichnung oder Kennung (A-1042) des Demonstrators/Netzgeräts' },
+  { schluessel: 'name', label: 'Bezeichnung', pflicht: true, hinweis: 'z. B. SPS Hauptsteuerung' },
+  { schluessel: 'typ', label: 'Art', hinweis: 'SPS, HMI / Panel, IO-Modul, Switch …' },
+  { schluessel: 'profinetName', label: 'ProfinetName', hinweis: 'NameOfStation, z. B. sps-hydraulik-01' },
+  { schluessel: 'ip', label: 'IP', hinweis: '192.168.0.10' },
+  { schluessel: 'subnetz', label: 'Subnetz', hinweis: '255.255.255.0' },
+  { schluessel: 'mac', label: 'MAC', hinweis: '00:1B:1B:AA:BB:CC' },
+  { schluessel: 'hersteller', label: 'Hersteller' },
+  { schluessel: 'bestellnummer', label: 'Bestellnummer', hinweis: 'z. B. 6ES7214-1AG40-0XB0' },
+  { schluessel: 'seriennummer', label: 'Seriennummer' },
+  { schluessel: 'uuid', label: 'UUID' },
+  { schluessel: 'firmware', label: 'Firmware' },
+  { schluessel: 'steckplatz', label: 'Steckplatz' },
+  { schluessel: 'benutzername', label: 'Benutzername' },
+  { schluessel: 'passwort', label: 'Passwort' },
+  { schluessel: 'notiz', label: 'Notiz' },
+];
+
+const BEISPIEL_ZEILEN = [
+  {
+    geraet: 'Hydraulik-Trainer', name: 'SPS Hauptsteuerung', typ: 'SPS',
+    profinetName: 'sps-hydraulik-01', ip: '192.168.0.10', subnetz: '255.255.255.0',
+    mac: '00:1B:1B:AA:BB:CC', hersteller: 'Siemens', bestellnummer: '6ES7214-1AG40-0XB0',
+    seriennummer: 'S-12345', uuid: '', firmware: 'V4.5', steckplatz: 'Rack 0, Slot 1',
+    benutzername: '', passwort: '', notiz: 'Hauptsteuerung des Trainers',
+  },
+  {
+    geraet: 'A-1042', name: 'Bedienpanel', typ: 'HMI / Panel',
+    profinetName: 'hmi-hydraulik-01', ip: '192.168.0.11', subnetz: '255.255.255.0',
+    mac: '', hersteller: 'Siemens', bestellnummer: '6AV2123-2GB03-0AX0',
+    seriennummer: '', uuid: '', firmware: '', steckplatz: '',
+    benutzername: 'admin', passwort: '', notiz: 'Kennung statt Name ist auch erlaubt',
+  },
+];
+
+// Excel unter Windows erwartet Semikolon und eine BOM — ohne die stehen Umlaute
+// als Buchstabensalat da, und ohne Semikolon landet alles in einer Spalte.
+function csvZeile(werte) {
+  return werte.map(w => {
+    const t = String(w ?? '');
+    return /[";\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }).join(';');
+}
+
+function vorlageCsv() {
+  const zeilen = [csvZeile(IMPORT_SPALTEN.map(s => s.label))];
+  for (const b of BEISPIEL_ZEILEN) zeilen.push(csvZeile(IMPORT_SPALTEN.map(s => b[s.schluessel] || '')));
+  return '﻿' + zeilen.join('\r\n') + '\r\n';
+}
+
+module.exports = function createKomponentenRouter(broadcast, homebox) {
   const r = express.Router();
   r.use(auth.requireAuth);
+
+  // Spaltenbeschreibung fürs Frontend (Zuordnung und Hilfetexte).
+  r.get('/spalten', (_req, res) => res.json(IMPORT_SPALTEN));
+
+  // Beispieldatei. Wer sie ausfüllt, hat eine gültige Importdatei.
+  r.get('/vorlage.csv', (_req, res) => {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="komponenten-vorlage.csv"');
+    res.send(vorlageCsv());
+  });
+
+  // Import. Die Zeilen kommen bereits zerlegt aus dem Browser — das Zerlegen
+  // von CSV gehört dorthin, wo die Datei liegt. Hier passiert das, was nur der
+  // Server kann: Geräte auflösen, prüfen, anlegen.
+  //
+  // Jede Zeile wird EINZELN beurteilt und einzeln gemeldet. Ein Abbruch beim
+  // ersten Fehler wäre bei 80 Zeilen die schlechteste aller Antworten.
+  r.post('/import', async (req, res) => {
+    const zeilen = Array.isArray((req.body || {}).zeilen) ? req.body.zeilen : null;
+    if (!zeilen) return res.status(400).json({ error: 'Es kamen keine Zeilen an.' });
+    if (zeilen.length > 500) return res.status(400).json({ error: 'Höchstens 500 Zeilen auf einmal.' });
+
+    // Geräte einmal auflösen und merken: 80 Zeilen für denselben Demonstrator
+    // sollen nicht 80 Homebox-Abfragen auslösen.
+    const geraeteCache = new Map();
+    async function geraetFinden(bezeichnung) {
+      const b = String(bezeichnung || '').trim();
+      if (!b) return null;
+      const key = b.toLowerCase();
+      if (geraeteCache.has(key)) return geraeteCache.get(key);
+
+      let treffer = null;
+      // Sieht es aus wie eine Kennung, zuerst danach suchen — das ist eindeutig.
+      if (/^A-\d+$/i.test(b)) {
+        treffer = await homebox.beiCode(b).catch(() => null);
+      }
+      if (!treffer) {
+        const { artikel } = await homebox.suchen({ q: b, proSeite: 25 }).catch(() => ({ artikel: [] }));
+        const genau = artikel.filter(a => String(a.name).trim().toLowerCase() === key);
+        // Mehrdeutig ist schlimmer als nicht gefunden: bei zwei gleichnamigen
+        // Geräten darf nicht geraten werden, an welches die SPS gehört.
+        if (genau.length === 1) treffer = genau[0];
+        else if (genau.length > 1) treffer = { mehrdeutig: true };
+      }
+      geraeteCache.set(key, treffer);
+      return treffer;
+    }
+
+    const ergebnisse = [];
+    for (let i = 0; i < zeilen.length; i++) {
+      const z = zeilen[i] || {};
+      const nummer = i + 1;
+      const daten = ausEingabe(z);
+
+      if (!String(z.geraet || '').trim()) {
+        ergebnisse.push({ zeile: nummer, ok: false, fehler: 'Spalte „Geraet" ist leer.' });
+        continue;
+      }
+      if (!daten.name) {
+        ergebnisse.push({ zeile: nummer, ok: false, fehler: 'Spalte „Bezeichnung" ist leer.' });
+        continue;
+      }
+
+      let geraet;
+      try {
+        geraet = await geraetFinden(z.geraet);
+      } catch (e) {
+        ergebnisse.push({ zeile: nummer, ok: false, fehler: `Gerät nicht abrufbar: ${e.message}` });
+        continue;
+      }
+      if (!geraet) {
+        ergebnisse.push({ zeile: nummer, ok: false, fehler: `Kein Gerät mit „${z.geraet}" gefunden.` });
+        continue;
+      }
+      if (geraet.mehrdeutig) {
+        ergebnisse.push({ zeile: nummer, ok: false, fehler: `„${z.geraet}" passt auf mehrere Artikel — bitte die Kennung (A-…) angeben.` });
+        continue;
+      }
+
+      const k = {
+        id: crypto.randomUUID(),
+        demonstratorId: geraet.id,
+        demonstratorName: geraet.name || '',
+        ...daten,
+        erstelltAm: nowIso(),
+        schemaVersion: 1,
+      };
+      db.saveKomponente(k);
+      ergebnisse.push({
+        zeile: nummer, ok: true, id: k.id, name: k.name,
+        geraetName: geraet.name || '',
+        konflikte: konflikteFinden(daten, k.id),
+      });
+    }
+
+    const angelegt = ergebnisse.filter(e => e.ok).length;
+    if (angelegt) broadcast({ type: 'komponente:import', anzahl: angelegt, origin: req.header('x-client-id') || '' });
+    res.json({ angelegt, fehler: ergebnisse.length - angelegt, ergebnisse });
+  });
 
   // Alle Komponenten oder die eines Demonstrators.
   r.get('/', (req, res) => {

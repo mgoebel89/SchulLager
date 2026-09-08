@@ -116,6 +116,27 @@
   const komponenteAnlegen = (k) => jsonFetch('/api/komponenten', { method: 'POST', body: k });
   const komponenteSpeichern = (id, k) => jsonFetch(`/api/komponenten/${encodeURIComponent(id)}`, { method: 'PUT', body: k });
   const komponenteLoeschen = (id) => jsonFetch(`/api/komponenten/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const komponentenSpalten = () => jsonFetch('/api/komponenten/spalten');
+
+  // --- Inventur ---
+  const listInventuren = () => jsonFetch('/api/inventur');
+  const getInventur = (id) => jsonFetch(`/api/inventur/${encodeURIComponent(id)}`);
+  const inventurStarten = (d) => jsonFetch('/api/inventur', { method: 'POST', body: d });
+  const inventurZaehlen = (id, p) => jsonFetch(`/api/inventur/${encodeURIComponent(id)}/position`, { method: 'POST', body: p });
+  const inventurAbschliessen = (id) => jsonFetch(`/api/inventur/${encodeURIComponent(id)}/abschliessen`, { method: 'POST' });
+  const inventurUebernehmen = (id) => jsonFetch(`/api/inventur/${encodeURIComponent(id)}/uebernehmen`, { method: 'POST' });
+  const inventurLoeschen = (id) => jsonFetch(`/api/inventur/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const komponentenImport = (zeilen) => jsonFetch('/api/komponenten/import', { method: 'POST', body: { zeilen } });
+
+  // Die Vorlage kommt als Text, nicht als JSON — deshalb an jsonFetch vorbei.
+  async function komponentenVorlage() {
+    const res = await fetch('/api/komponenten/vorlage.csv', {
+      credentials: 'same-origin',
+      headers: { 'X-Client-Id': CLIENT_ID },
+    });
+    if (!res.ok) throw new ApiFehler(`Fehler ${res.status}`, res.status);
+    return res.text();
+  }
 
   // --- Ausleihe und Defektmeldungen (eigene Datenbank, nicht Homebox) ---
   // `art` trennt Ausleihen (mit Rückgabe) von Ausgaben (Dokumentation).
@@ -199,6 +220,9 @@
     lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerNachMarke, lagerFoto,
     lagerHersteller, ortAnlegen, markeAnlegen,
     listKomponenten, netzUebersicht, komponenteAnlegen, komponenteSpeichern, komponenteLoeschen,
+    komponentenSpalten, komponentenVorlage, komponentenImport,
+    listInventuren, getInventur, inventurStarten, inventurZaehlen,
+    inventurAbschliessen, inventurUebernehmen, inventurLoeschen,
     listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
     listDefekte, defektMelden, defektBehoben,
     subscribe, connectWs,

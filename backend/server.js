@@ -22,6 +22,7 @@ const createBenutzerRouter = require('./routes/benutzer');
 const createLagerRouter = require('./routes/lager');
 const createAusleiheRouter = require('./routes/ausleihe');
 const createKomponentenRouter = require('./routes/komponenten');
+const createInventurRouter = require('./routes/inventur');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -68,7 +69,12 @@ app.use('/api/lager', createLagerRouter());
 app.use('/api/ausleihe', createAusleiheRouter(broadcast));
 
 // --- Komponenten der Demonstratoren (Profinet-Angaben; nur angemeldet) ---
-app.use('/api/komponenten', createKomponentenRouter(broadcast));
+// Der Komponenten-Router braucht Homebox, um beim CSV-Import Gerätenamen und
+// Kennungen in Artikel-IDs aufzulösen.
+app.use('/api/komponenten', createKomponentenRouter(broadcast, require('./homebox')));
+
+// --- Inventur (Zähl-Läufe; schreibt erst beim Übernehmen nach Homebox) ---
+app.use('/api/inventur', createInventurRouter(broadcast, require('./homebox')));
 
 // --- App-Einstellungen ---
 // Lesen darf jeder Angemeldete (die Oberfläche braucht z. B. die Klassenliste),

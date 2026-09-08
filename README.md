@@ -138,6 +138,35 @@ SPS-Board ist kein Demonstrator. Der Menüpunkt **Geräte** zeigt beide, oben
 umschaltbar. Beim Anlegen eines Netzgeräts öffnet sich direkt die Eingabe der
 Netzangaben.
 
+### Inventur
+
+Gezählt wird ein Lagerort nach dem anderen: Sollbestand steht da, „stimmt" ist
+ein Griff, eine abweichende Zahl kostet zwei. Artikel lassen sich auch scannen
+und einzeln zählen.
+
+**Zählen verändert den Bestand nicht.** Erst der ausdrückliche Schritt
+*Bestände übernehmen* schreibt nach Homebox — und dann **absolut**, denn genau
+dafür ist eine Inventur da. So kann man in Ruhe zählen, Abweichungen klären und
+erst danach buchen.
+
+Der **Sollbestand wird beim ersten Anzeigen mitgeschrieben**. Sonst verschöbe
+sich das Ziel während des Zählens: bucht jemand am anderen Ende der Schule eine
+Entnahme, stimmte plötzlich die abgehakte Position nicht mehr, und niemand
+könnte sagen, warum.
+
+Es kann immer nur **eine** Inventur offen sein — sonst zählen zwei Leute
+dasselbe Regal in verschiedene Läufe.
+
+### CSV-Import für Komponenten
+
+Unter *Netzübersicht → CSV-Import*: Beispieldatei herunterladen, ausfüllen,
+einlesen. Semikolon und Komma werden beide erkannt, ebenso die von Excel
+geschriebene Bytemarke. Vor dem Schreiben zeigt eine **Vorschau** die
+Spaltenzuordnung — eine verrutschte Spalte fällt so auf, bevor achtzig
+Datensätze in der Datenbank stehen. Das Gerät wird über Bezeichnung oder
+Kennung (`A-…`) gefunden; bei zwei gleichnamigen Geräten verlangt der Import
+die Kennung, statt zu raten.
+
 ### Netzangaben und Komponenten (Profinet)
 
 Bei einem Demonstrator beschreiben die Einträge seine Einbauten, bei einem
@@ -211,7 +240,9 @@ wandern können.
 - [x] **Erweiterungen aus dem Betrieb:** Demonstratoren und Lagerorte aus der
       Weboberfläche anlegen, Hersteller-Vorschläge, Anschaffungskosten,
       Profinet-Komponenten mit Netzübersicht, Ausgaben-PDF nach Gruppen.
-- [ ] Phase 5 — Inventur
+- [x] **Phase 5 — Inventur:** Zähl-Läufe Regal für Regal, Sollwert-Schnappschuss,
+      Abweichungsliste, Übernahme der gezählten Bestände und Protokoll-PDF.
+- [x] **CSV-Import** für Komponenten samt Beispieldatei.
 - [ ] Phase 6 — Beschaffung und Dokumente
 - [ ] Phase 3 — Etiketten (ans Ende geschoben; braucht die genauen
       Brother-Modelle)

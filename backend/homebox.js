@@ -743,33 +743,73 @@ async function markeSicherstellen(name) {
 // Lagerorte werden bisher in Homebox gepflegt. Für den Alltag ist das ein
 // Bruch: wer vor einem neuen Schrank steht, will ihn dort anlegen, wo er
 // gerade arbeitet.
+// FALLE, real aufgetreten (2026-09-08): Ein POST auf /v1/entities mit
+// `isLocation: true` wurde ANGENOMMEN — aber das Feld ignoriert. Homebox legte
+// einen ganz normalen Artikel an. Für den Nutzer sah das aus wie „nichts
+// passiert": kein Fehler, und unter den Lagerorten stand nichts. In Wahrheit
+// lag ein Artikel namens „Schrank 4" im Bestand.
+//
+// Lehre daraus, dieselbe wie beim Feld- und Tag-Filter: Ein Feld, das der
+// Server nicht kennt, wird stillschweigend verworfen. Deshalb wird hier NICHT
+// geglaubt, was der POST antwortet — es wird nachgesehen, ob der Ort wirklich
+// als Lagerort existiert. Und was fälschlich als Artikel entstand, wird wieder
+// entfernt, statt als Müll liegen zu bleiben.
 async function ortAnlegen({ name, elternId, beschreibung }) {
   const bezeichnung = String(name || '').trim();
   if (!bezeichnung) throw new HomeboxError('Es fehlt die Bezeichnung.', 400);
 
   const stil = await stilErmitteln();
-  let angelegt;
-  if (stil === 'entities') {
-    // In der neuen API ist ein Lagerort eine Entität wie jede andere, nur mit
-    // gesetztem isLocation.
-    angelegt = await api('/api/v1/entities', {
-      method: 'POST',
-      body: {
-        name: bezeichnung,
-        description: beschreibung || '',
-        isLocation: true,
-        parentId: elternId || undefined,
-      },
-    });
-  } else {
-    angelegt = await api('/api/v1/locations', {
-      method: 'POST',
-      body: { name: bezeichnung, description: beschreibung || '', parentId: elternId || undefined },
-    });
+  const rumpf = { name: bezeichnung, description: beschreibung || '' };
+
+  // Der klassische Endpunkt zuerst: den kennen auch die meisten neueren
+  // Versionen noch, und er ist eindeutig. Die Entity-Varianten sind Vermutungen
+  // über die verschmolzene API und stehen deshalb dahinter.
+  const varianten = [
+    { was: 'POST /v1/locations', pfad: '/api/v1/locations', body: { ...rumpf, parentId: elternId || undefined } },
+    { was: 'POST /v1/entities (type=location)', pfad: '/api/v1/entities', body: { ...rumpf, type: 'location', parentId: elternId || undefined } },
+    { was: 'POST /v1/entities (isLocation)', pfad: '/api/v1/entities', body: { ...rumpf, isLocation: true, parentId: elternId || undefined } },
+  ];
+  if (stil === 'items') varianten.length = 1;   // alte API hat nur den einen Weg
+
+  const versucht = [];
+  for (const v of varianten) {
+    let angelegt = null;
+    try {
+      angelegt = await api(v.pfad, { method: 'POST', body: v.body });
+    } catch (e) {
+      versucht.push(`${v.was} → ${e.message}`);
+      continue;
+    }
+    if (!angelegt || !angelegt.id) {
+      versucht.push(`${v.was} → Antwort ohne ID`);
+      continue;
+    }
+
+    // Nachsehen statt glauben.
+    const treffer = (await orte().catch(() => [])).find(o => o.id === angelegt.id);
+    if (treffer) {
+      cacheVerwerfen();
+      return treffer;
+    }
+
+    // Angelegt, aber kein Lagerort — also ein Artikel. Wieder wegräumen,
+    // sonst sammelt sich im Bestand Müll an, den niemand zuordnen kann.
+    versucht.push(`${v.was} → angenommen, aber kein Lagerort daraus geworden`);
+    await artikelLoeschen(angelegt.id).catch(() => {});
   }
-  if (!angelegt || !angelegt.id) throw new HomeboxError('Homebox hat keine ID für den neuen Lagerort geliefert.', 502);
-  cacheVerwerfen();
-  return normOrt(angelegt);
+
+  throw new HomeboxError(
+    'Homebox hat den Lagerort nicht angelegt. Versucht wurde: ' + versucht.join(' | ')
+    + '. Bitte den Lagerort vorerst in Homebox selbst anlegen — und diese Meldung weitergeben.',
+    502,
+  );
+}
+
+// Nur für den Aufräumfall oben. Bewusst nicht exportiert: Artikel löscht diese
+// App sonst nirgends, das gehört in Homebox.
+async function artikelLoeschen(id) {
+  const stil = await stilErmitteln();
+  await api(artikelPfad(stil, id), { method: 'DELETE' });
 }
 
 // --- Hersteller-Vorschläge ------------------------------------------------

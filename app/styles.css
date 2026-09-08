@@ -878,3 +878,18 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
    Knopf; als Link braucht er die Textauszeichnung zurückgenommen. */
 .geraete-filter { margin: 0 0 12px; }
 .geraete-filter a.chip { text-decoration: none; }
+
+/* Vorschautabelle beim CSV-Import. Schmal und dicht — es geht darum, eine
+   verrutschte Spalte zu erkennen, nicht ums Lesen der Inhalte. */
+.import-tabelle { border-collapse: collapse; font-size: .82rem; white-space: nowrap; }
+.import-tabelle th, .import-tabelle td {
+  border-bottom: 1px solid var(--rand); padding: 4px 8px; text-align: left;
+}
+.import-tabelle th { background: var(--akzent-blass); color: var(--akzent-dunkel); }
+
+/* Zählfeld in der Inventur — schmal, groß, mittig: es wird einhändig bedient,
+   oft mit der anderen Hand am Regal. */
+.zaehl-feld { width: 5.5rem; text-align: center; font-size: 1.1rem; font-weight: 600; }
+.zaehl-feld::-webkit-outer-spin-button,
+.zaehl-feld::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.zaehl-feld { -moz-appearance: textfield; }

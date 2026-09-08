@@ -234,7 +234,11 @@
       return;
     }
 
-    mount.appendChild(el('div', { class: 'toolbar' }, [el('h1', {}, 'Netzübersicht')]));
+    mount.appendChild(el('div', { class: 'toolbar' }, [
+      el('h1', {}, 'Netzübersicht'),
+      el('span', { class: 'spacer' }),
+      el('a', { class: 'btn', href: '#/import' }, '⤒ CSV-Import'),
+    ]));
     const behaelter = el('div');
     mount.appendChild(behaelter);
     behaelter.appendChild(karte(null, el('p', { class: 'muted' }, 'Wird geladen…')));

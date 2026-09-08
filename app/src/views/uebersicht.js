@@ -35,6 +35,7 @@
       kacheln.appendChild(kachel('Aufnehmen', 'Neuen Artikel anlegen, Barcode scannen', '#/neu', true));
       kacheln.appendChild(kachel('Ausleihe', 'Wer hat welches Gerät, und was ist überfällig?', '#/ausleihe', true));
       kacheln.appendChild(kachel('Nachbestellen', 'Was ist unter den Mindestbestand gerutscht?', '#/nachbestellung', true));
+      kacheln.appendChild(kachel('Inventur', 'Regal für Regal zählen, Abweichungen festhalten', '#/inventur', true));
     }
     mount.appendChild(karte('Schnellzugriff', kacheln));
 
