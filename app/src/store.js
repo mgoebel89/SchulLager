@@ -61,6 +61,29 @@
     }
   }
 
+  // --- Lagerorte -----------------------------------------------------------
+  // Einzige Ausnahme von „nichts zwischenspeichern": der Lagerortbaum. Er ist
+  // Struktur, kein Bestand — er ändert sich selten, wird aber auf fast jeder
+  // Seite gebraucht (Pfadanzeige, Filter, Baum). Der Zwischenspeicher lebt nur
+  // im Arbeitsspeicher dieser Sitzung und lässt sich erzwungen erneuern.
+  let ortCache = null;
+  let ortLaden = null;
+
+  async function orteLaden({ neu = false } = {}) {
+    if (neu) { ortCache = null; ortLaden = null; }
+    if (ortCache) return ortCache;
+    // Mehrere gleichzeitige Aufrufe (Baum und Pfadanzeige zusammen) sollen
+    // EINE Abfrage auslösen, nicht zwei.
+    if (!ortLaden) {
+      ortLaden = SL.api.lagerOrte()
+        .then(liste => { ortCache = liste || []; return ortCache; })
+        .catch(e => { ortLaden = null; throw e; });
+    }
+    return ortLaden;
+  }
+
+  function orteVergessen() { ortCache = null; ortLaden = null; }
+
   // --- Anmeldung -----------------------------------------------------------
   async function anmelden(benutzername, passwort) {
     const { benutzer } = await SL.api.anmelden(benutzername, passwort);
@@ -125,6 +148,7 @@
     state,
     onChange,
     bootstrap, settingsLaden, lagerZustandLaden,
+    orteLaden, orteVergessen,
     anmelden, ersteinrichtung, abmelden, passwortAendern,
     settingsSpeichern,
     istAngemeldet, istAdmin, mussPasswortWechseln, darfBuchen,

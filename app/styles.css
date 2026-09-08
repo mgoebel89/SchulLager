@@ -768,3 +768,46 @@ textarea.inp { resize: vertical; min-height: 70px; }
 a.kachel { text-decoration: none; color: inherit; }
 a.kachel h3 { color: var(--akzent-dunkel); }
 a.kachel:hover { border-color: var(--akzent-hell); }
+
+/* ---------------------------------------------------------------------------
+   Phase 1: Artikelliste, Artikeldetail, Lagerortbaum
+   --------------------------------------------------------------------------- */
+
+/* Anklickbare Listeneinträge. Auf dem Handy ist die ganze Zeile das Ziel —
+   ein kleiner Textlink daneben wäre mit dem Daumen nicht zu treffen. */
+a.eintrag-klick { display: block; text-decoration: none; color: inherit; }
+a.eintrag-klick:hover { background: var(--akzent-blass); }
+a.eintrag-klick strong { color: var(--akzent-dunkel); }
+
+/* Bestand im Artikeldetail: die Zahl ist die Antwort auf die häufigste Frage
+   am Regal und darf deshalb aus zwei Metern lesbar sein. */
+.artikel-kopf {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  margin-bottom: 12px;
+}
+.artikel-menge { display: flex; align-items: baseline; gap: 6px; }
+.artikel-zahl { font-size: 2.1rem; font-weight: 600; line-height: 1; color: var(--akzent-dunkel); }
+
+/* Filterchip mit Entfernen-Kreuz (z. B. „nur dieser Lagerort") */
+.chip-x {
+  border: 0; background: transparent; cursor: pointer;
+  color: inherit; font-size: 1rem; line-height: 1; padding: 0 0 0 6px;
+}
+
+/* Lagerortbaum */
+.ort-baum { margin-top: 10px; }
+.ort-zeile {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 4px; border-radius: 6px;
+}
+.ort-zeile:hover { background: var(--akzent-blass); }
+.ort-zeile-aktiv { background: var(--akzent-blass); box-shadow: inset 3px 0 0 var(--akzent); }
+.ort-name { flex: 1; text-decoration: none; padding: 3px 0; }
+.ort-zeile-aktiv .ort-name { font-weight: 600; }
+/* Klapp-Fläche mit 28px: kleiner trifft man mit dem Daumen nicht zuverlässig. */
+.ort-klapp {
+  flex: 0 0 auto; width: 28px; height: 28px;
+  border: 0; background: transparent; cursor: pointer;
+  color: var(--text-schwach); font-size: .9rem; line-height: 1;
+}
+.ort-klapp-leer { cursor: default; }

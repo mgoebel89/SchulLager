@@ -78,7 +78,23 @@ backend/    Node/Express + SQLite
   homebox.js    Homebox-Client — hier steckt das meiste Fachwissen
   routes/       auth, benutzer, lager
 app/        Vanilla-JS-Frontend, Namensraum `SL`
+  src/models.js   u. a. `codeArt` — deutet gescannte Zeichenketten
+  src/ui/scanner.js  Kamera-Scanner (nativ + ZXing)
+  vendor/         ZXing als fertige Datei; der Container braucht kein Internet
 ```
+
+### Was sich scannen lässt
+
+| Sorte | Beispiel | Wirkung |
+|---|---|---|
+| Handelsbarcode | `4001234567890` | Artikel über das Homebox-Feld `Barcode` |
+| Eigenes Artikel-Etikett | `A-1042` oder `https://…/#/a/A-1042` | Artikel über das Feld `Code` |
+| Eigenes Ort-Etikett | `O-17` oder `https://…/#/o/O-17` | Lagerort mit Inhalt |
+| Homebox-Etikett | Adresse mit Artikel-UUID | Artikel direkt |
+
+Beim eigenen Etikett wird der **Host bewusst nicht geprüft**: die Schule
+erreicht denselben Container mal über die IP, mal über einen Namen — ein
+Hostvergleich würde eigene Etiketten verwerfen.
 
 Stack und Designsprache folgen den Schwesterprojekten *Gemeindeverwaltung* und
 *ImkereiApp*, damit sich die Anwendungen gleich anfühlen und Bausteine
@@ -89,8 +105,10 @@ wandern können.
 - [x] **Phase 0 — Fundament:** Installer, HTTPS, Benutzerverwaltung mit Rollen,
       erzwungener Passwortwechsel, Gast-Lesezugang, Homebox-Anbindung mit
       Sammlungsauswahl.
-- [ ] Phase 1 — Suchen und Scannen (Artikelsuche, Lagerortbaum, Kamera-Scanner,
-      QR-Kurzwege)
+- [x] **Phase 1 — Suchen und Scannen:** Artikelsuche mit Lagerortfilter,
+      Artikeldetail, Lagerortbaum, Kamera-Scanner (BarcodeDetector mit
+      ZXing-Rückfall für iOS) und die QR-Kurzwege `#/a/<Kennung>` und
+      `#/o/<Kennung>`.
 - [ ] Phase 2 — Buchen (Entnahme/Rückgabe, Mindestbestand, Neuaufnahme per Scan)
 - [ ] Phase 3 — Etiketten (drei Größen, PDF und Direktdruck auf Brother-Geräte)
 - [ ] Phase 4 — Ausleihe (Person und Klasse, Rückgabedatum, Defektmeldung)

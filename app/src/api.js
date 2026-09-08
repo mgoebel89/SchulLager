@@ -91,6 +91,7 @@
     return jsonFetch('/api/lager/?' + p.toString());
   }
   const lagerOrte = () => jsonFetch('/api/lager/orte');
+  const lagerOrt = (id) => jsonFetch(`/api/lager/orte/${encodeURIComponent(id)}`);
   const lagerMarken = () => jsonFetch('/api/lager/marken');
   const lagerArtikel = (id) => jsonFetch(`/api/lager/${encodeURIComponent(id)}`);
   const lagerBeiBarcode = (code) => jsonFetch(`/api/lager/barcode/${encodeURIComponent(code)}`);
@@ -141,7 +142,7 @@
     listBenutzer, benutzerAnlegen, benutzerSpeichern, benutzerPasswort, benutzerLoeschen,
     getSettings, putSettings,
     lagerConfig, putLagerConfig, lagerHealth, lagerSammlungen,
-    lagerSuchen, lagerOrte, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
+    lagerSuchen, lagerOrte, lagerOrt, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
     lagerAnlegen, lagerSpeichern, lagerBestand,
     subscribe, connectWs,
   };

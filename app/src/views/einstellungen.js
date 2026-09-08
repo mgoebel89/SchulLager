@@ -145,6 +145,9 @@
             try {
               await SL.api.putLagerConfig({ groupId: gewaehlt, groupName: g ? g.name : '' });
               toast('Sammlung gewechselt.');
+              // Die Lagerorte gehören zur Sammlung — der Zwischenspeicher wäre
+              // sonst der Baum des vorigen Bestands.
+              SL.store.orteVergessen();
               await SL.store.lagerZustandLaden();
               SL.app.neuZeichnen();
             } catch (e) { toast(e.message || 'Wechsel fehlgeschlagen.'); }

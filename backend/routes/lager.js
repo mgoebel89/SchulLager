@@ -59,6 +59,11 @@ module.exports = function createLagerRouter() {
   }));
 
   r.get('/orte', fang(async (_req, res) => res.json(await homebox.orte())));
+  r.get('/orte/:id', fang(async (req, res) => {
+    const o = await homebox.ortHolen(req.params.id);
+    if (!o) return res.status(404).json({ error: 'Lagerort nicht gefunden.' });
+    res.json(o);
+  }));
   r.get('/marken', fang(async (_req, res) => res.json(await homebox.marken())));
 
   r.get('/barcode/:code', fang(async (req, res) => {

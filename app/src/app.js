@@ -136,7 +136,29 @@
   }
 
   // ---------- Router ----------
+  // Die zuvor besuchte Adresse merken, damit „‹ Zurück" aus einem Artikel in
+  // dieselbe Trefferliste zurückführt statt auf eine leere Suche.
+  let vorher = '';
+  let jetzt = location.hash || '#/';
+  function vorigeAdresse() { return vorher; }
+
+  // Adresse austauschen, ohne den Verlauf zu füllen und ohne neu zu zeichnen —
+  // das braucht die Artikelsuche, die den Suchbegriff bei jedem Tastendruck
+  // mitschreibt.
+  //
+  // Der Router muss dabei mitgezogen werden: `history.replaceState` löst kein
+  // hashchange aus, `jetzt` bliebe also auf dem Stand des letzten Aufbaus
+  // stehen — und „‹ Zurück" aus einem Artikel führte auf die leere Suche
+  // statt auf die Trefferliste, aus der man gekommen ist.
+  function adresseErsetzen(neu) {
+    if (location.hash === neu) return;
+    history.replaceState(null, '', neu);
+    jetzt = neu;
+  }
+
   function router() {
+    const neu = location.hash || '#/';
+    if (neu !== jetzt) { vorher = jetzt; jetzt = neu; }
     const { path, params } = parseHash();
     mount.innerHTML = '';
     mount.scrollTop = 0;
@@ -162,17 +184,35 @@
     }
     if (path === '/benutzer') return SL.views.renderBenutzer(mount);
     if (path === '/einstellungen') return SL.views.renderEinstellungen(mount, params);
+    if (path === '/artikel') return SL.views.renderArtikel(mount, params);
+    if (path === '/orte') return SL.views.renderOrte(mount, params);
+    if (path === '/scannen') return SL.views.renderScannen(mount);
 
-    // Ab Phase 1/3/4. Bewusst als benannte Platzhalter und nicht als „Seite
+    // Kurzwege aus den QR-Etiketten. Sie sind bewusst knapp: jedes Zeichen
+    // mehr macht das aufgedruckte Muster feiner und schlechter lesbar.
+    if (path.startsWith('/a/') || path.startsWith('/o/')) return kurzweg(path);
+
+    // Ab Phase 3/4. Bewusst als benannte Platzhalter und nicht als „Seite
     // nicht gefunden": die Navigationspunkte stehen schon da, und ein
     // Fehlertext dahinter sähe nach Defekt aus.
-    if (path === '/artikel') return platzhalter('Artikel', 'Suche und Artikeldetails kommen in der nächsten Ausbaustufe.');
-    if (path === '/orte') return platzhalter('Lagerorte', 'Der Lagerortbaum kommt in der nächsten Ausbaustufe.');
-    if (path === '/scannen') return platzhalter('Scannen', 'Der Kamera-Scanner kommt in der nächsten Ausbaustufe.');
     if (path === '/ausleihe') return platzhalter('Ausleihe', 'Ausleihe und Rückgabe kommen in einer späteren Ausbaustufe.');
     if (path === '/etiketten') return platzhalter('Etiketten', 'Etikettendruck kommt in einer späteren Ausbaustufe.');
 
     return platzhalter('Seite nicht gefunden', 'Diese Adresse gibt es nicht.');
+  }
+
+  // Ein gescanntes Etikett landet hier: die Kennung wird nachgeschlagen und
+  // die Adresse durch das eigentliche Ziel ersetzt. Solange das läuft, steht
+  // eine Zwischenmeldung — sonst sieht man auf dem Handy einen Moment nichts
+  // und tippt nach.
+  function kurzweg(path) {
+    const code = decodeURIComponent(path.slice(3));
+    mount.appendChild(SL.ui.karte(null, SL.ui.el('p', { class: 'muted' }, `Kennung ${code} wird nachgeschlagen…`)));
+    SL.views.codeAufloesen(code).then(() => {
+      // Blieb die Adresse stehen, wurde nichts gefunden — der Dialog aus
+      // codeAufloesen erklärt es bereits; hier nur nicht hängen bleiben.
+      if (location.hash.startsWith('#/a/') || location.hash.startsWith('#/o/')) location.hash = '#/scannen';
+    });
   }
 
   function platzhalter(titel, text) {
@@ -207,7 +247,7 @@
   }
 
   window.SL = window.SL || {};
-  SL.app = { neuZeichnen, router };
+  SL.app = { neuZeichnen, router, vorigeAdresse, adresseErsetzen };
 
   window.addEventListener('hashchange', router);
   if (document.readyState === 'loading') {

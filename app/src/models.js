@@ -72,9 +72,53 @@
     return teile.join(trenner);
   }
 
+  // --- Gescannte Zeichenketten deuten --------------------------------------
+  // Aus der Kamera kommt eine nackte Zeichenkette. Was damit gemeint ist,
+  // entscheidet sich hier — an EINER Stelle, damit Scanner, Suchfeld und
+  // Handeingabe nicht auseinanderlaufen.
+  //
+  // Vier Sorten kommen im Schullager vor:
+  //   artikel     eigenes QR-Etikett  → .../#/a/A-1042  oder  bloß "A-1042"
+  //   ort         Etikett am Fach     → .../#/o/O-17    oder  bloß "O-17"
+  //   homeboxId   von Homebox selbst gedrucktes Etikett (URL mit UUID)
+  //   barcode     alles andere: Handelsware mit EAN/UPC
+  const RE_ARTIKEL = /^A-\d+$/i;
+  const RE_ORT = /^O-\d+$/i;
+  const RE_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+  function codeArt(text) {
+    const t = String(text || '').trim();
+    if (!t) return { art: 'leer', wert: '' };
+
+    // Eigenes Etikett als vollständige Adresse. Der Host wird bewusst NICHT
+    // geprüft: die Schule erreicht denselben Container mal über die IP, mal
+    // über einen Namen — ein Hostvergleich würde eigene Etiketten verwerfen.
+    const eigen = t.match(/#\/(a|o)\/([^/?#\s]+)/i);
+    if (eigen) {
+      return {
+        art: eigen[1].toLowerCase() === 'a' ? 'artikel' : 'ort',
+        wert: decodeURIComponent(eigen[2]).toUpperCase(),
+      };
+    }
+
+    if (RE_ARTIKEL.test(t)) return { art: 'artikel', wert: t.toUpperCase() };
+    if (RE_ORT.test(t)) return { art: 'ort', wert: t.toUpperCase() };
+
+    // Von Homebox selbst gedruckte Etiketten tragen eine Adresse mit der
+    // Artikel-UUID. Die lässt sich direkt aufschlagen — bequem für alles, was
+    // schon vor dieser App etikettiert wurde.
+    if (/^https?:\/\//i.test(t)) {
+      const uuid = t.match(RE_UUID);
+      if (uuid) return { art: 'homeboxId', wert: uuid[0] };
+    }
+
+    return { art: 'barcode', wert: t };
+  }
+
   SL.models = {
     ROLLEN, ROLLE_LABEL,
     defaultSettings, mergeSettingsDefaults,
     ortBaum, ortPfad,
+    codeArt,
   };
 })();

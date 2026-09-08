@@ -304,6 +304,10 @@ function normOrt(roh) {
     beschreibung: roh.description || '',
     elternId: roh.parentId || (eltern ? eltern.id : ''),
     anzahl: roh.itemCount != null ? roh.itemCount : null,
+    // Kurzkennung fürs QR-Etikett am Fach (ab Phase 3 vergeben). Die alte
+    // Locations-API kennt keine benutzerdefinierten Felder — dort bleibt der
+    // Wert leer, und der Ort wird über seine ID angesprochen.
+    code: feldLesen(roh.fields, FELD_CODE),
   };
 }
 
