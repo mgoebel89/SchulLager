@@ -44,12 +44,22 @@ Zertifikat lässt sich später unter `/etc/ssl/schullager/` hinterlegen.
 
 ## Betrieb
 
-| Aufgabe | Befehl (im Container oder per `pct exec <CTID> --`) |
+In der **Container-Konsole**:
+
+| Aufgabe | Befehl |
 |---|---|
 | Aktualisieren | `update` |
 | Sicherung sofort | `schullager-backup` |
 | Einrichtung wiederholen | `schullager-setup` |
 | Protokoll ansehen | `journalctl -u schullager-backend -f` |
+
+Vom **Proxmox-Host** besser über den vollen Pfad — die Kurzbefehle liegen in
+`/usr/local/bin`, das bei `pct exec` nicht zwingend im Suchpfad steht:
+
+```bash
+pct exec <CTID> -- bash /opt/schullager/deploy/update.sh
+pct exec <CTID> -- bash /opt/schullager/deploy/container-setup.sh
+```
 
 Die nächtliche Sicherung (3:30 Uhr) legt Datenbank-Kopien unter
 `/var/backups/schullager/` ab. **Sie enthält den Artikelbestand nicht** — der

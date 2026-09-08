@@ -163,6 +163,15 @@ else
   err "Statt der App kommt etwas anderes (vermutlich noch die nginx-Startseite)."; FEHLER=1
 fi
 
+# Die Kurzbefehle mitprüfen. Sie werden erst nach nginx eingerichtet — bricht
+# das Skript vorher ab, fehlen sie, und ein späteres `update` scheitert mit
+# einer Meldung, die nicht verrät, warum (real erlebt, 2026-09-08).
+if [[ -x /usr/local/bin/schullager-update && -x /usr/local/bin/update ]]; then
+  ok "Kurzbefehle eingerichtet (update, schullager-backup, schullager-setup)."
+else
+  err "Die Kurzbefehle fehlen — Updates gehen dann nur über bash ${APP_DIR}/deploy/update.sh"; FEHLER=1
+fi
+
 trap - ERR
 if [[ "$FEHLER" -ne 0 ]]; then
   err "Einrichtung unvollständig — siehe Meldungen oben."

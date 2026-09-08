@@ -172,8 +172,10 @@ echo "    eine Warnung. Einmal bestätigen, danach ist Ruhe. HTTPS ist nötig, d
 echo "    Barcode-Scan und Kamera-Fotos am Handy überhaupt funktionieren."
 echo
 echo "  Update später einspielen:"
-echo "    • vom Proxmox-Host:      pct exec $CTID -- update"
-echo "    • in der Container-Konsole einfach:   update"
+echo "    • in der Container-Konsole:  update"
+echo "    • vom Proxmox-Host:          pct exec $CTID -- bash /opt/schullager/deploy/update.sh"
+echo "      (der Kurzbefehl 'update' setzt voraus, dass /usr/local/bin im"
+echo "       Suchpfad liegt — über den vollen Pfad geht es immer)"
 echo
 echo "  Einrichtung wiederholen (falls etwas hakt):"
 echo "    pct exec $CTID -- schullager-setup"
