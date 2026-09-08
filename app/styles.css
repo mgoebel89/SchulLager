@@ -851,3 +851,13 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
 .ortwahl-eintrag:hover { background: var(--akzent-blass); }
 .ortwahl-aktuell { background: var(--akzent-blass); }
 .ortwahl-pfad { flex: 1; }
+
+/* ---------------------------------------------------------------------------
+   Phase 4: Ausleihe
+   --------------------------------------------------------------------------- */
+
+/* Der Artikelname in der Ausleihliste ist der Weg zum Gerät — er soll wie ein
+   Link aussehen, ohne die ganze Zeile zum Link zu machen (daneben stehen
+   Knöpfe, die etwas anderes tun). */
+.leih-titel { font-weight: 600; text-decoration: none; }
+.leih-titel:hover { text-decoration: underline; }

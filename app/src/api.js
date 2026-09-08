@@ -102,6 +102,15 @@
 
   const lagerNachbestellung = () => jsonFetch('/api/lager/nachbestellung');
 
+  // --- Ausleihe und Defektmeldungen (eigene Datenbank, nicht Homebox) ---
+  const listAusleihen = (alle) => jsonFetch('/api/ausleihe' + (alle ? '?alle=1' : ''));
+  const ausleihen = (a) => jsonFetch('/api/ausleihe', { method: 'POST', body: a });
+  const rueckgabe = (id) => jsonFetch(`/api/ausleihe/${encodeURIComponent(id)}/rueckgabe`, { method: 'POST' });
+  const ausleiheLoeschen = (id) => jsonFetch(`/api/ausleihe/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const listDefekte = (alle) => jsonFetch('/api/ausleihe/defekte' + (alle ? '?alle=1' : ''));
+  const defektMelden = (d) => jsonFetch('/api/ausleihe/defekte', { method: 'POST', body: d });
+  const defektBehoben = (id) => jsonFetch(`/api/ausleihe/defekte/${encodeURIComponent(id)}/behoben`, { method: 'POST' });
+
   // Datei-Upload läuft NICHT über jsonFetch: bei multipart muss der Browser den
   // Content-Type samt Grenzmarke selbst setzen. Wer ihn von Hand setzt, macht
   // die Teile für den Server unlesbar.
@@ -167,6 +176,8 @@
     lagerConfig, putLagerConfig, lagerHealth, lagerSammlungen,
     lagerSuchen, lagerOrte, lagerOrt, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
     lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerFoto,
+    listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
+    listDefekte, defektMelden, defektBehoben,
     subscribe, connectWs,
   };
 })();

@@ -20,6 +20,7 @@ const auth = require('./auth');
 const createAuthRouter = require('./routes/auth');
 const createBenutzerRouter = require('./routes/benutzer');
 const createLagerRouter = require('./routes/lager');
+const createAusleiheRouter = require('./routes/ausleihe');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -61,6 +62,9 @@ app.use('/api/benutzer', createBenutzerRouter());
 
 // --- Lager (Homebox-Proxy; Rechte regelt der Router je Route) ---
 app.use('/api/lager', createLagerRouter());
+
+// --- Ausleihe und Defektmeldungen (nur angemeldet; regelt der Router) ---
+app.use('/api/ausleihe', createAusleiheRouter(broadcast));
 
 // --- App-Einstellungen ---
 // Lesen darf jeder Angemeldete (die Oberfläche braucht z. B. die Klassenliste),

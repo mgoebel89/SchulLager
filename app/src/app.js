@@ -18,7 +18,7 @@
       { path: '/nachbestellung', label: 'Nachbestellen', icon: 'cart', angemeldet: true },
     ] },
     { label: 'Ausgabe', items: [
-      { path: '/ausleihe', label: 'Ausleihe', icon: 'hand' },
+      { path: '/ausleihe', label: 'Ausleihe', icon: 'hand', angemeldet: true },
       { path: '/etiketten', label: 'Etiketten', icon: 'tag' },
     ] },
     { footer: true, items: [
@@ -192,6 +192,7 @@
     if (path === '/scannen') return SL.views.renderScannen(mount);
     if (path === '/neu') return SL.views.renderNeuaufnahme(mount, params);
     if (path === '/nachbestellung') return SL.views.renderNachbestellung(mount);
+    if (path === '/ausleihe') return SL.views.renderAusleihe(mount, params);
 
     // Kurzwege aus den QR-Etiketten. Sie sind bewusst knapp: jedes Zeichen
     // mehr macht das aufgedruckte Muster feiner und schlechter lesbar.
@@ -200,7 +201,6 @@
     // Ab Phase 3/4. Bewusst als benannte Platzhalter und nicht als „Seite
     // nicht gefunden": die Navigationspunkte stehen schon da, und ein
     // Fehlertext dahinter sähe nach Defekt aus.
-    if (path === '/ausleihe') return platzhalter('Ausleihe', 'Ausleihe und Rückgabe kommen in einer späteren Ausbaustufe.');
     if (path === '/etiketten') return platzhalter('Etiketten', 'Etikettendruck kommt in einer späteren Ausbaustufe.');
 
     return platzhalter('Seite nicht gefunden', 'Diese Adresse gibt es nicht.');

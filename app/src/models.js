@@ -115,10 +115,61 @@
     return { art: 'barcode', wert: t };
   }
 
+  // --- Ausleihe -------------------------------------------------------------
+  // Eine Ausleihe verändert den Bestand NICHT. Ein Demonstrator, der im
+  // Unterricht steht, gehört weiterhin zum Inventar — er ist nur nicht im
+  // Schrank. Verbrauchsmaterial wird stattdessen entnommen, und das senkt den
+  // Bestand sehr wohl. Zwei Wege, zwei Bedeutungen.
+
+  // Vorschlag fürs Rückgabedatum: zwei Wochen. Lang genug für eine
+  // Unterrichtsreihe, kurz genug, dass ein vergessenes Gerät auffällt.
+  const LEIHDAUER_TAGE = 14;
+
+  function faelligVorschlag(heute = new Date()) {
+    const d = new Date(heute.getTime());
+    d.setDate(d.getDate() + LEIHDAUER_TAGE);
+    return dateToIso(d);
+  }
+
+  // ISO-Datum aus den LOKALEN Komponenten bauen. `toISOString()` rechnet nach
+  // UTC um und schiebt damit in unserer Zeitzone jeden Abend auf den Vortag —
+  // eine Falle, die in den Schwesterprojekten schon zweimal zugeschlagen hat.
+  function dateToIso(d) {
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const t = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${t}`;
+  }
+
+  function heuteIso() { return dateToIso(new Date()); }
+
+  // Fristampel einer laufenden Ausleihe.
+  function leihStatus(a, heute = heuteIso()) {
+    if (a.zurueckAm) return { art: 'zurueck', label: 'zurückgegeben', klasse: 'ampel-ok' };
+    if (!a.faelligAm) return { art: 'offen', label: 'ohne Frist', klasse: 'ampel-offen' };
+    if (a.faelligAm < heute) {
+      const tage = tageZwischen(a.faelligAm, heute);
+      return { art: 'ueberfaellig', label: `${tage} ${tage === 1 ? 'Tag' : 'Tage'} überfällig`, klasse: 'ampel-faellig' };
+    }
+    if (a.faelligAm === heute) return { art: 'heute', label: 'heute fällig', klasse: 'ampel-bald' };
+    const tage = tageZwischen(heute, a.faelligAm);
+    return { art: 'laufend', label: `noch ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`, klasse: 'ampel-ok' };
+  }
+
+  // Ganze Tage zwischen zwei ISO-Daten. Über Mitternacht (12 Uhr UTC) rechnen,
+  // damit die Sommerzeitumstellung keinen halben Tag verschluckt.
+  function tageZwischen(vonIso, bisIso) {
+    const [jv, mv, tv] = String(vonIso).split('-').map(Number);
+    const [jb, mb, tb] = String(bisIso).split('-').map(Number);
+    const von = Date.UTC(jv, mv - 1, tv);
+    const bis = Date.UTC(jb, mb - 1, tb);
+    return Math.round((bis - von) / 86400000);
+  }
+
   SL.models = {
     ROLLEN, ROLLE_LABEL,
     defaultSettings, mergeSettingsDefaults,
     ortBaum, ortPfad,
     codeArt,
+    LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
   };
 })();

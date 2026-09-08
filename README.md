@@ -71,6 +71,7 @@ liegt in Homebox und wird dort gesichert.
 |---|---|---|---|
 | Suchen, Artikel und Lagerort ansehen | ✓ | ✓ | ✓ |
 | Buchen, anlegen, umlagern, Nachbestell-Liste | — | ✓ | ✓ |
+| Ausleihe und Defektmeldungen sehen und buchen | — | ✓ | ✓ |
 | Benutzer, Homebox-Zugang, Einstellungen | — | — | ✓ |
 
 Lesen ohne Anmeldung ist Absicht: wer den QR-Code an einem Gerät scannt, soll
@@ -104,6 +105,19 @@ rechnen kann Homebox nicht — die Nachbestell-Liste geht deshalb serverseitig
 einmal durch den Bestand und hält das Ergebnis 60 Sekunden vor. Jeder
 Schreibvorgang verwirft diesen Merker, damit eine Entnahme sofort auftaucht.
 
+### Ausleihe
+
+Eine Ausleihe **verändert den Bestand nicht**. Ein Demonstrator, der im
+Unterricht steht, gehört weiterhin zum Inventar — er ist nur nicht im Schrank.
+Verbrauchsmaterial wird stattdessen *entnommen*, und das senkt den Bestand sehr
+wohl. Zwei Wege, zwei Bedeutungen; würden beide am Bestand rechnen, könnte
+nach einem halben Jahr niemand mehr sagen, was die Zahl bedeutet.
+
+Ausleihen und Defektmeldungen liegen in der **eigenen Datenbank** — Homebox
+kennt keinen Begriff dafür. Wer was hat, ist eine Personenangabe und deshalb
+auch zum Lesen nur angemeldet einsehbar. Die Klassenliste wird unter
+Einstellungen → Allgemein gepflegt.
+
 ### Was sich scannen lässt
 
 | Sorte | Beispiel | Wirkung |
@@ -133,10 +147,12 @@ wandern können.
 - [x] **Phase 2 — Buchen:** Entnahme und Rückgabe mit Stückzahl, Bearbeiten,
       Umlagern, Foto an den Artikel, Neuaufnahme per Scan und die
       Nachbestell-Liste.
-- [ ] Phase 3 — Etiketten (drei Größen, PDF und Direktdruck auf Brother-Geräte)
-- [ ] Phase 4 — Ausleihe (Person und Klasse, Rückgabedatum, Defektmeldung)
+- [x] **Phase 4 — Ausleihe:** Geräte an Lehrkraft und Klasse, Rückgabedatum mit
+      Fristampel, Überfälligkeitsliste, Defektmeldungen.
 - [ ] Phase 5 — Inventur
 - [ ] Phase 6 — Beschaffung und Dokumente
+- [ ] Phase 3 — Etiketten (ans Ende geschoben; braucht die genauen
+      Brother-Modelle)
 
 ## Hinweise für die Weiterentwicklung
 

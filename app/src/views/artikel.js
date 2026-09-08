@@ -216,6 +216,23 @@
     // in der Zwischenzeit kann jemand anders am selben Regal gebucht haben.
     const neuLaden = () => SL.app.router();
 
+    // Ausleihe und Defektmeldungen liegen in unserer Datenbank und sind nur
+    // angemeldet abrufbar. Fehlschläge dürfen die Artikelansicht nicht
+    // mitreißen — sie ist auch ohne diese Angaben brauchbar.
+    let leihe = null;
+    let defekt = null;
+    if (SL.store.darfBuchen()) {
+      const [ausleihen, defekte] = await Promise.all([
+        SL.api.listAusleihen(false).catch(() => []),
+        SL.api.listDefekte(false).catch(() => []),
+      ]);
+      leihe = ausleihen.find(x => x.artikelId === a.id && !x.zurueckAm) || null;
+      defekt = defekte.find(x => x.artikelId === a.id && !x.behobenAm) || null;
+    }
+
+    if (defekt) behaelter.appendChild(defektHinweis(defekt, neuLaden));
+    if (leihe) behaelter.appendChild(leihHinweis(leihe, neuLaden));
+
     // Die Buchungskarte steht vor den Stammdaten. Wer am Regal steht, will
     // entnehmen — nicht erst an Beschreibung und Hersteller vorbeiscrollen.
     if (SL.store.darfBuchen()) behaelter.appendChild(buchenKarte(a, neuLaden));
@@ -250,6 +267,16 @@
       ? el('div', { class: 'btn-reihe' }, [
         el('button', { class: 'btn btn-sm', type: 'button', onclick: () => bearbeitenDialog(a, neuLaden) }, 'Bearbeiten'),
         el('button', { class: 'btn btn-sm', type: 'button', onclick: () => umlagern(a, neuLaden) }, 'Umlagern'),
+        // Verliehen? Dann führt der Weg über die Rückgabe oben, nicht über
+        // einen zweiten Ausleih-Knopf.
+        leihe ? null : el('button', {
+          class: 'btn btn-sm', type: 'button',
+          onclick: () => SL.views.ausleihenDialog(a, neuLaden),
+        }, 'Ausleihen'),
+        defekt ? null : el('button', {
+          class: 'btn btn-sm', type: 'button',
+          onclick: () => SL.views.defektDialog(a, neuLaden),
+        }, 'Defekt melden'),
         SL.ui.fotoPickButtons(async (datei) => {
           try {
             const klein = await SL.ui.resizeImageFile(datei);
@@ -280,6 +307,59 @@
         '.',
       ])));
     }
+  }
+
+  // Verliehen: der Zustand gehört ganz nach oben. Wer den Artikel sucht,
+  // findet ihn nicht im Schrank — und die Antwort warum, muss die erste sein.
+  function leihHinweis(leihe, neuLaden) {
+    const st = SL.models.leihStatus(leihe);
+    return karte(null, [
+      el('div', { class: 'daten-zeile status-zeile' }, [
+        el('span', { class: 'ampel ' + st.klasse }, 'verliehen'),
+        el('span', {}, [
+          `an ${leihe.benutzerName}`,
+          leihe.klasse ? ` (Klasse ${leihe.klasse})` : '',
+          ` seit ${SL.ui.formatDatum(String(leihe.ausgeliehenAm).slice(0, 10))}`,
+          leihe.faelligAm ? ` — ${st.label}` : '',
+        ].join('')),
+      ]),
+      leihe.notiz ? el('p', { class: 'muted' }, leihe.notiz) : null,
+      el('div', { class: 'btn-reihe' }, [
+        el('button', {
+          class: 'btn btn-primary btn-sm', type: 'button',
+          onclick: async () => {
+            try {
+              await SL.api.rueckgabe(leihe.id);
+              SL.ui.toast('Zurückgebucht.');
+              neuLaden();
+            } catch (e) { SL.ui.toast(e.message || 'Rückgabe fehlgeschlagen.', 4500); }
+          },
+        }, 'Zurückgenommen'),
+      ]),
+    ]);
+  }
+
+  function defektHinweis(defekt, neuLaden) {
+    return karte(null, [
+      el('div', { class: 'daten-zeile status-zeile' }, [
+        el('span', { class: 'ampel ampel-faellig' }, 'defekt'),
+        el('span', {}, defekt.notiz),
+      ]),
+      el('p', { class: 'muted' },
+        `gemeldet von ${defekt.gemeldetVon} am ${SL.ui.formatDatum(String(defekt.gemeldetAm).slice(0, 10))}`),
+      el('div', { class: 'btn-reihe' }, [
+        el('button', {
+          class: 'btn btn-sm', type: 'button',
+          onclick: async () => {
+            try {
+              await SL.api.defektBehoben(defekt.id);
+              SL.ui.toast('Als repariert vermerkt.');
+              neuLaden();
+            } catch (e) { SL.ui.toast(e.message || 'Das hat nicht geklappt.', 4500); }
+          },
+        }, 'Repariert'),
+      ]),
+    ]);
   }
 
   // --- Buchen --------------------------------------------------------------

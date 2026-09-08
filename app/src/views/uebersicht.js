@@ -5,9 +5,9 @@
 
   const { el, karte } = SL.ui;
 
-  // Startbildschirm. In Phase 0 beantwortet er vor allem drei Fragen:
-  // Wer bin ich, hängt Homebox dran, und was kommt als Nächstes?
-  // Die Kacheln für Scannen/Suchen/Ausleihe füllen sich in den Folgephasen.
+  // Startbildschirm: wer bin ich, hängt Homebox dran, und was will ich tun?
+  // Die Kacheln zeigen nur, was der Angemeldete auch darf — ein Gast sieht
+  // Suchen, Scannen und Lagerorte.
   function renderUebersicht(mount) {
     const s = SL.store.state;
 
@@ -32,9 +32,9 @@
     kacheln.appendChild(kachel('Lagerorte', 'Räume, Schränke und Fächer durchgehen', '#/orte', true));
     if (SL.store.darfBuchen()) {
       kacheln.appendChild(kachel('Aufnehmen', 'Neuen Artikel anlegen, Barcode scannen', '#/neu', true));
+      kacheln.appendChild(kachel('Ausleihe', 'Wer hat welches Gerät, und was ist überfällig?', '#/ausleihe', true));
       kacheln.appendChild(kachel('Nachbestellen', 'Was ist unter den Mindestbestand gerutscht?', '#/nachbestellung', true));
     }
-    kacheln.appendChild(kachel('Ausleihe', 'Wer hat was — kommt in einer späteren Ausbaustufe', '', false));
     mount.appendChild(karte('Schnellzugriff', kacheln));
 
     // --- Hinweis für Gäste --------------------------------------------------
