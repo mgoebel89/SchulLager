@@ -101,9 +101,16 @@
   const lagerBestand = (id, arg) => jsonFetch(`/api/lager/${encodeURIComponent(id)}/bestand`, { method: 'POST', body: arg });
 
   const lagerNachbestellung = () => jsonFetch('/api/lager/nachbestellung');
+  const lagerNachMarke = (name) => jsonFetch(`/api/lager/marke/${encodeURIComponent(name)}`);
 
   // --- Ausleihe und Defektmeldungen (eigene Datenbank, nicht Homebox) ---
-  const listAusleihen = (alle) => jsonFetch('/api/ausleihe' + (alle ? '?alle=1' : ''));
+  // `art` trennt Ausleihen (mit Rückgabe) von Ausgaben (Dokumentation).
+  function listAusleihen(alle, art) {
+    const p = new URLSearchParams();
+    if (alle) p.set('alle', '1');
+    if (art) p.set('art', art);
+    return jsonFetch('/api/ausleihe' + (p.toString() ? '?' + p.toString() : ''));
+  }
   const ausleihen = (a) => jsonFetch('/api/ausleihe', { method: 'POST', body: a });
   const rueckgabe = (id) => jsonFetch(`/api/ausleihe/${encodeURIComponent(id)}/rueckgabe`, { method: 'POST' });
   const ausleiheLoeschen = (id) => jsonFetch(`/api/ausleihe/${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -175,7 +182,7 @@
     getSettings, putSettings,
     lagerConfig, putLagerConfig, lagerHealth, lagerSammlungen,
     lagerSuchen, lagerOrte, lagerOrt, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
-    lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerFoto,
+    lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerNachMarke, lagerFoto,
     listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
     listDefekte, defektMelden, defektBehoben,
     subscribe, connectWs,

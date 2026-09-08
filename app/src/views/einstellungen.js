@@ -166,19 +166,29 @@
     const klassen = el('textarea', { class: 'inp', rows: 6 });
     klassen.value = (s.klassen || []).join('\n');
 
+    const marke = input({ value: s.demonstratorMarke || 'Demonstrator' });
+
     mount.appendChild(karte('Allgemein', [
       feld('Schule', schule),
       feld('Klassen und Gruppen (eine je Zeile)', klassen, { breit: true }),
-      el('p', { class: 'muted' }, 'Die Klassenliste wird bei der Ausleihe angeboten, damit erkennbar bleibt, in welchem Projekt ein Gerät steckt.'),
+      el('p', { class: 'muted' }, 'Die Klassenliste wird bei Ausleihe und Ausgabe angeboten, damit erkennbar bleibt, in welchem Projekt etwas steckt.'),
+      feld('Homebox-Tag für Demonstratoren', marke),
+      el('p', { class: 'muted' },
+        'Woran erkennt die App ein Schulgerät? An diesem Tag in Homebox. Nur getaggte Artikel '
+        + 'lassen sich ausleihen; alles andere gilt als Verbrauchsmaterial und wird ausgegeben. '
+        + 'Der Tag wird in Homebox angelegt und dort den Geräten zugewiesen.'),
       el('div', { class: 'btn-reihe' }, [
         el('button', {
           class: 'btn btn-primary', type: 'button',
           onclick: async () => {
+            // Ein leerer Tagname würde jeden Artikel zum Demonstrator machen.
+            if (!marke.value.trim()) { toast('Bitte einen Tag-Namen angeben.'); return; }
             try {
               await SL.store.settingsSpeichern({
                 ...s,
                 schule: schule.value.trim(),
                 klassen: klassen.value.split('\n').map(z => z.trim()).filter(Boolean),
+                demonstratorMarke: marke.value.trim(),
               });
               toast('Gespeichert.');
             } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }

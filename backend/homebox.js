@@ -576,7 +576,12 @@ const NACHBESTELL_TTL_MS = 60 * 1000;
 const MAX_DURCHGANG = 2000;
 let nachbestellCache = null;
 
-function cacheVerwerfen() { nachbestellCache = null; }
+function cacheVerwerfen() {
+  nachbestellCache = null;
+  // Eine Änderung kann eine Marke setzen oder nehmen — der Demonstrator-Merker
+  // wäre sonst bis zu einer Minute falsch.
+  markeCacheVerwerfen();
+}
 
 async function nachbestellung() {
   if (nachbestellCache && Date.now() - nachbestellCache.zeit < NACHBESTELL_TTL_MS) {
@@ -623,6 +628,93 @@ async function detailsNachladen(artikel) {
     out.push(...await Promise.all(buendel.map(a => holen(a.id).catch(() => null))));
   }
   return out;
+}
+
+// --- Artikel einer Marke (Tag) --------------------------------------------
+// Die Schule unterscheidet Bauteile von Schuldemonstratoren. Getragen wird der
+// Unterschied von einem Homebox-Tag (Voreinstellung „Demonstrator") — bewusst
+// kein eigenes Feld: Tags sind auch in Homebox' eigener Oberfläche sichtbar und
+// lassen sich dort bequem an vorhandene Artikel vergeben.
+//
+// FALLE, dieselbe wie beim Feldfilter: ein Filterparameter, den der Server
+// nicht kennt, wird schlicht IGNORIERT — die Antwort sähe dann aus wie „alles
+// passt", und jedes Kleinteil gälte als Demonstrator. Deshalb wird das Ergebnis
+// des Serverfilters überprüft: trägt auch nur ein Treffer die Marke nicht, war
+// der Filter wirkungslos, und es wird selbst gefiltert.
+const MARKE_TTL_MS = 60 * 1000;
+let markeCache = new Map();
+
+function markeCacheVerwerfen() { markeCache = new Map(); }
+
+function hatMarke(artikel, name) {
+  const n = String(name || '').trim().toLowerCase();
+  return (artikel.marken || []).some(m => String(m.name || '').trim().toLowerCase() === n);
+}
+
+async function nachMarke(markeName) {
+  const name = String(markeName || '').trim();
+  if (!name) return { artikel: [], geprueft: 0, unvollstaendig: false, markeGefunden: false };
+
+  const gemerkt = markeCache.get(name.toLowerCase());
+  if (gemerkt && Date.now() - gemerkt.zeit < MARKE_TTL_MS) return gemerkt.daten;
+
+  const stil = await stilErmitteln();
+  const alleMarken = await marken().catch(() => []);
+  const marke = alleMarken.find(m => String(m.name || '').trim().toLowerCase() === name.toLowerCase());
+
+  // Gibt es die Marke gar nicht, ist die Antwort „keine Demonstratoren" —
+  // und die Oberfläche kann erklären, dass der Tag erst vergeben werden muss.
+  if (!marke) {
+    const daten = { artikel: [], geprueft: 0, unvollstaendig: false, markeGefunden: false };
+    markeCache.set(name.toLowerCase(), { zeit: Date.now(), daten });
+    return daten;
+  }
+
+  // 1. Serverfilter versuchen — und das Ergebnis nachprüfen.
+  try {
+    const params = stil === 'entities'
+      ? { tagIds: marke.id, pageSize: 200 }
+      : { labels: marke.id, pageSize: 200 };
+    const { eintraege } = listeAus(await api(artikelPfad(stil), { params }));
+    const artikel = eintraege.map(normArtikel);
+    if (artikel.length && artikel.every(a => hatMarke(a, name))) {
+      const daten = { artikel, geprueft: artikel.length, unvollstaendig: false, markeGefunden: true };
+      markeCache.set(name.toLowerCase(), { zeit: Date.now(), daten });
+      return daten;
+    }
+  } catch (_) { /* alte Version kennt den Parameter nicht — unten weiter */ }
+
+  // 2. Selbst filtern.
+  const daten = await durchgangNachMarke(name);
+  markeCache.set(name.toLowerCase(), { zeit: Date.now(), daten });
+  return daten;
+}
+
+async function durchgangNachMarke(name) {
+  const stil = await stilErmitteln();
+  const listenPfad = artikelPfad(stil);
+  const proSeite = 100;
+  const treffer = [];
+  let geprueft = 0;
+  let unvollstaendig = false;
+
+  for (let seite = 1; seite <= Math.ceil(MAX_DURCHGANG / proSeite); seite++) {
+    const { eintraege, gesamt } = listeAus(await api(listenPfad, { params: { page: seite, pageSize: proSeite } }));
+    if (!eintraege.length) break;
+    const artikel = eintraege.map(normArtikel);
+
+    // Tragen die Kurzfassungen keine Marken, müssen die Details her — sonst
+    // fände man nie einen Demonstrator.
+    const ohneMarken = artikel.every(a => !a.marken.length);
+    const geprueftePosten = ohneMarken ? await detailsNachladen(artikel) : artikel;
+    for (const a of geprueftePosten) if (a && hatMarke(a, name)) treffer.push(a);
+
+    geprueft += eintraege.length;
+    if (eintraege.length < proSeite || (gesamt && geprueft >= gesamt)) break;
+    if (geprueft >= MAX_DURCHGANG) { unvollstaendig = true; break; }
+  }
+  treffer.sort((a, b) => String(a.name).localeCompare(String(b.name), 'de'));
+  return { artikel: treffer, geprueft, unvollstaendig, markeGefunden: true };
 }
 
 // --- Anhänge --------------------------------------------------------------
@@ -694,7 +786,7 @@ module.exports = {
   suchen, holen, beiBarcode, beiCode, beiFeld,
   orte, ortHolen, marken,
   anlegen, aktualisieren, bestandAendern,
-  nachbestellung, anhangHochladen,
+  nachbestellung, anhangHochladen, nachMarke,
   // für Tests
   _normArtikel: normArtikel,
   _normOrt: normOrt,

@@ -226,9 +226,14 @@
         SL.api.listAusleihen(false).catch(() => []),
         SL.api.listDefekte(false).catch(() => []),
       ]);
-      leihe = ausleihen.find(x => x.artikelId === a.id && !x.zurueckAm) || null;
+      leihe = ausleihen.find(x => x.artikelId === a.id
+        && (x.art || 'ausleihe') === 'ausleihe' && !x.zurueckAm) || null;
       defekt = defekte.find(x => x.artikelId === a.id && !x.behobenAm) || null;
     }
+
+    // Demonstrator oder Verbrauchsmaterial? Hier ist die Prüfung verlässlich:
+    // `a` ist der DETAIL-Datensatz und trägt die Marken vollständig.
+    const istDemo = SL.models.istDemonstrator(a, SL.store.state.settings.demonstratorMarke);
 
     if (defekt) behaelter.appendChild(defektHinweis(defekt, neuLaden));
     if (leihe) behaelter.appendChild(leihHinweis(leihe, neuLaden));
@@ -267,12 +272,21 @@
       ? el('div', { class: 'btn-reihe' }, [
         el('button', { class: 'btn btn-sm', type: 'button', onclick: () => bearbeitenDialog(a, neuLaden) }, 'Bearbeiten'),
         el('button', { class: 'btn btn-sm', type: 'button', onclick: () => umlagern(a, neuLaden) }, 'Umlagern'),
+        // Ausleihen gibt es NUR für Demonstratoren (so entschieden): sonst
+        // „leiht" jemand 200 Widerstände aus, die nie zurückkommen.
+        // Verbrauchsmaterial wird stattdessen ausgegeben — das bucht den
+        // Bestand ab und hält fest, an welche Klasse es ging.
+        //
         // Verliehen? Dann führt der Weg über die Rückgabe oben, nicht über
         // einen zweiten Ausleih-Knopf.
-        leihe ? null : el('button', {
+        (leihe || !istDemo) ? null : el('button', {
           class: 'btn btn-sm', type: 'button',
           onclick: () => SL.views.ausleihenDialog(a, neuLaden),
         }, 'Ausleihen'),
+        istDemo ? null : el('button', {
+          class: 'btn btn-sm', type: 'button',
+          onclick: () => SL.views.ausgabeDialog(a, neuLaden),
+        }, 'Ausgabe an Gruppe'),
         defekt ? null : el('button', {
           class: 'btn btn-sm', type: 'button',
           onclick: () => SL.views.defektDialog(a, neuLaden),

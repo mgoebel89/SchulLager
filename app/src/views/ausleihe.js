@@ -31,6 +31,12 @@
         class: 'btn btn-sm',
         href: alleZeigen ? '#/ausleihe' : '#/ausleihe?alle=1',
       }, alleZeigen ? 'Nur offene' : 'Auch zurückgegebene'),
+      // Der Einstieg gehört HIERHER. Wer etwas ausleihen will, geht auf die
+      // Ausleihseite — nicht erst in die Artikelsuche.
+      el('button', {
+        class: 'btn btn-primary', type: 'button',
+        onclick: () => geraetWaehlenUndAusleihen(),
+      }, '+ Ausleihen'),
     ]));
 
     const behaelter = el('div');
@@ -56,9 +62,20 @@
     // die dringendere Information als eine Frist in zehn Tagen.
     if (defekte.length) behaelter.appendChild(defektKarte(defekte));
 
-    const offen = liste.filter(a => !a.zurueckAm);
+    const offen = liste.filter(a => !a.zurueckAm && (a.art || 'ausleihe') === 'ausleihe');
     if (!offen.length && !alleZeigen) {
-      behaelter.appendChild(karte(null, el('p', {}, 'Zurzeit ist nichts ausgeliehen.')));
+      behaelter.appendChild(karte(null, [
+        el('p', {}, 'Zurzeit ist nichts ausgeliehen.'),
+        el('p', { class: 'muted' },
+          'Zum Ausleihen oben auf „+ Ausleihen" — oder das Gerät scannen und im Artikel „Ausleihen" wählen. '
+          + 'Ausgeliehen werden nur Demonstratoren; Verbrauchsmaterial wird entnommen und dabei auf Wunsch einer Klasse zugeschrieben.'),
+        el('div', { class: 'btn-reihe' }, [
+          el('button', { class: 'btn btn-primary', type: 'button', onclick: () => geraetWaehlenUndAusleihen() }, '+ Ausleihen'),
+        ]),
+      ]));
+      // Auch ohne offene Ausleihe kann es Ausgaben geben — sie hier
+      // wegzulassen hieße, gebuchte Vorgänge zu verstecken.
+      behaelter.appendChild(await ausgabenKarte());
       return;
     }
 
@@ -87,6 +104,106 @@
         behaelter.appendChild(karte(`Zurückgegeben (${zurueck.length})`, box));
       }
     }
+
+    // Ausgaben stehen immer unten und immer eingeklappt: sie sind Dokumentation,
+    // keine offene Aufgabe. Wer sie sucht, sucht gezielt.
+    behaelter.appendChild(await ausgabenKarte());
+  }
+
+  async function ausgabenKarte() {
+    const box = el('div');
+    const details = el('details', { class: 'aufklapp' }, [
+      el('summary', {}, 'Ausgaben an Klassen (Dokumentation)'),
+      box,
+    ]);
+    box.appendChild(el('p', { class: 'muted' }, 'Wird geladen…'));
+
+    let ausgaben = [];
+    try {
+      ausgaben = await SL.api.listAusleihen(true, 'ausgabe');
+    } catch (e) {
+      box.innerHTML = '';
+      box.appendChild(el('p', { class: 'anmeldung-fehler' }, e.message || ''));
+      return karte(null, details);
+    }
+
+    box.innerHTML = '';
+    if (!ausgaben.length) {
+      box.appendChild(el('p', { class: 'muted' },
+        'Noch nichts ausgegeben. Verbrauchsmaterial wird im Artikel über „Ausgabe an Gruppe" gebucht — '
+        + 'der Bestand sinkt dabei, zurück erwartet wird nichts.'));
+      return karte(null, details);
+    }
+
+    ausgaben.sort((a, b) => String(b.ausgeliehenAm).localeCompare(String(a.ausgeliehenAm)));
+    const liste = el('div', { class: 'liste' });
+    for (const a of ausgaben.slice(0, 100)) {
+      liste.appendChild(el('a', { class: 'eintrag eintrag-klick', href: `#/artikel?id=${encodeURIComponent(a.artikelId)}` }, [
+        el('div', { class: 'benutzer-kopf' }, [
+          el('strong', {}, a.artikelName || '(Artikel)'),
+          el('span', { class: 'tag' }, `${a.menge} Stück`),
+        ]),
+        el('div', { class: 'muted' }, [
+          SL.ui.formatDatum(String(a.ausgeliehenAm).slice(0, 10)),
+          a.klasse ? ' · an ' + a.klasse : '',
+          ' · gebucht von ' + a.benutzerName,
+          a.notiz ? ' · ' + a.notiz : '',
+        ].join('')),
+      ]));
+    }
+    box.appendChild(liste);
+    if (ausgaben.length > 100) {
+      box.appendChild(el('p', { class: 'muted' }, `${ausgaben.length} Einträge — die 100 jüngsten sind gezeigt.`));
+    }
+    return karte(null, details);
+  }
+
+  // Gerät auswählen und ausleihen.
+  //
+  // Ausgeliehen wird NUR, was den Demonstrator-Tag trägt (so entschieden) —
+  // sonst „leiht" jemand 200 Widerstände aus, die nie zurückkommen. Geprüft
+  // wird am DETAIL-Datensatz: Listenantworten von Homebox sind Kurzfassungen
+  // und tragen die Marken nicht zuverlässig mit.
+  function geraetWaehlenUndAusleihen() {
+    SL.ui.artikelWaehlen({
+      titel: 'Was soll ausgeliehen werden?',
+      onWahl: async (treffer) => {
+        let artikel = treffer;
+        try {
+          artikel = await SL.api.lagerArtikel(treffer.id);
+        } catch (_) { /* ohne Detail mit dem Treffer weiterarbeiten */ }
+
+        const marke = SL.store.state.settings.demonstratorMarke || 'Demonstrator';
+        if (!SL.models.istDemonstrator(artikel, marke)) {
+          keinDemonstrator(artikel, marke);
+          return;
+        }
+        ausleihenDialog(artikel, () => SL.app.router());
+      },
+    });
+  }
+
+  // Kein Demonstrator: nicht einfach abweisen, sondern den richtigen Weg
+  // anbieten. Die Ausgabe ist genau dafür da.
+  function keinDemonstrator(artikel, marke) {
+    const m = SL.ui.modal('Nicht zum Ausleihen', el('div', {}, [
+      el('p', {}, [
+        el('strong', {}, artikel.name || '(Artikel)'),
+        ` trägt nicht den Tag „${marke}" und gilt damit als Verbrauchsmaterial.`,
+      ]),
+      el('p', { class: 'muted' },
+        'Verbrauchsmaterial wird entnommen statt ausgeliehen — dabei lässt sich festhalten, '
+        + 'an welche Klasse es ging. Zurück erwartet wird es nicht.'),
+    ]), {
+      fuss: [
+        el('button', { class: 'btn', type: 'button', onclick: () => m.close() }, 'Abbrechen'),
+        el('span', { class: 'spacer' }),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: () => { m.close(); ausgabeDialog(artikel, () => SL.app.router()); },
+        }, 'Stattdessen ausgeben'),
+      ],
+    });
   }
 
   function zeile(a) {
@@ -221,6 +338,58 @@
     });
   }
 
+  // Ausgabe an eine Gruppe: bucht den Bestand ab UND schreibt mit, wohin es
+  // ging. Zwei Schritte, die zusammengehören — deshalb ein Dialog.
+  function ausgabeDialog(artikel, fertig) {
+    const klassen = SL.store.state.settings.klassen || [];
+    let klasse = '';
+    const klassenFeld = klassen.length
+      ? select(klassen.map(k => ({ wert: k, label: k })), '', v => { klasse = v; }, { leerLabel: '— keine Klasse —' })
+      : input({ placeholder: 'z. B. BSMT 22b' });
+
+    const menge = input({ type: 'number', min: '1', value: '1', inputmode: 'numeric' });
+    const notiz = textarea({ rows: 2, placeholder: 'z. B. Projekt Ampelsteuerung' });
+
+    const dlg = SL.ui.modal(`Ausgeben: ${artikel.name}`, [
+      el('p', { class: 'muted' },
+        `Bestand zurzeit ${artikel.menge} Stück. Die ausgegebene Menge wird abgebucht — `
+        + 'zurück erwartet wird nichts, der Eintrag dient der Dokumentation.'),
+      feld('Anzahl', menge),
+      feld('An Klasse oder Gruppe', klassenFeld),
+      feld('Wofür', notiz),
+    ], {
+      fuss: [
+        el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            const n = Math.max(1, parseInt(menge.value, 10) || 1);
+            if (n > artikel.menge && !confirmDialog(
+              `Es sind nur ${artikel.menge} Stück verzeichnet, ausgegeben werden sollen ${n}. `
+              + 'Trotzdem buchen? Der Bestand geht dann auf 0.')) return;
+            try {
+              // Erst abbuchen, dann protokollieren. Andersherum stünde bei
+              // einem Fehlschlag eine Ausgabe im Protokoll, die nie stattfand.
+              await SL.api.lagerBestand(artikel.id, { delta: -n });
+              await SL.api.ausleihen({
+                art: 'ausgabe',
+                artikelId: artikel.id,
+                artikelName: artikel.name,
+                artikelCode: artikel.code || '',
+                menge: n,
+                klasse: klassen.length ? klasse : klassenFeld.value.trim(),
+                notiz: notiz.value.trim(),
+              });
+              dlg.close();
+              toast(`${n} ausgegeben.`);
+              fertig();
+            } catch (e) { toast(e.message || 'Das hat nicht geklappt.', 5000); }
+          },
+        }, 'Ausgeben'),
+      ],
+    });
+  }
+
   function defektDialog(artikel, fertig) {
     const notiz = textarea({ rows: 3, placeholder: 'Was ist kaputt?' });
     const dlg = SL.ui.modal(`Defekt melden: ${artikel.name}`, [
@@ -254,5 +423,6 @@
 
   SL.views.renderAusleihe = renderAusleihe;
   SL.views.ausleihenDialog = ausleihenDialog;
+  SL.views.ausgabeDialog = ausgabeDialog;
   SL.views.defektDialog = defektDialog;
 })();

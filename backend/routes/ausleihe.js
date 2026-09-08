@@ -27,32 +27,59 @@ module.exports = function createAusleiheRouter(broadcast) {
   const r = express.Router();
   r.use(auth.requireAuth);
 
-  // --- Ausleihen ----------------------------------------------------------
+  // --- Ausleihen und Ausgaben ---------------------------------------------
+  // ZWEI VORGÄNGE, EINE TABELLE, unterschieden durch `art`:
+  //
+  //   ausleihe   Schuldemonstrator geht an eine Lehrkraft und kommt zurück.
+  //              Hat eine Frist, wird zurückgebucht, taucht in der
+  //              Überfälligkeitsliste auf. Der Bestand bleibt unverändert.
+  //   ausgabe    Verbrauchsmaterial geht an eine Klasse und kommt NICHT zurück
+  //              (Widerstände, die verlötet werden). Die Menge ist bereits über
+  //              die Entnahme vom Bestand abgebucht; dieser Eintrag ist reine
+  //              Dokumentation — wer hat wann wie viel wofür bekommen.
+  //
+  // Sie in einer Tabelle zu führen, hält die Geschichte eines Artikels an einer
+  // Stelle. Getrennt würde man beim Nachschauen immer beide durchsehen müssen.
   r.get('/', (req, res) => {
     const alle = db.listAusleihen();
-    // Voreinstellung sind die offenen: das ist die Frage, die im Alltag
-    // gestellt wird („wer hat das Ding?"). Die Rückgaben will man selten sehen.
-    const offen = req.query.alle === '1' ? alle : alle.filter(a => !a.zurueckAm);
-    offen.sort((a, b) => String(a.faelligAm || '9999').localeCompare(String(b.faelligAm || '9999')));
-    res.json(offen);
+    const art = req.query.art || '';
+    let liste = art ? alle.filter(a => (a.art || 'ausleihe') === art) : alle;
+    // Voreinstellung sind die offenen Ausleihen: das ist die Frage, die im
+    // Alltag gestellt wird („wer hat das Ding?"). Ausgaben sind nie offen —
+    // sie werden nur zurückgegeben, wenn man sie ausdrücklich anfordert.
+    if (req.query.alle !== '1') {
+      liste = liste.filter(a => (a.art || 'ausleihe') === 'ausleihe' && !a.zurueckAm);
+    }
+    // Ausleihen nach Frist (das Dringendste zuerst), Ausgaben nach Datum.
+    liste.sort((a, b) => String(a.faelligAm || a.ausgeliehenAm || '9999')
+      .localeCompare(String(b.faelligAm || b.ausgeliehenAm || '9999')));
+    res.json(liste);
   });
 
   r.post('/', (req, res) => {
     const { artikelId, artikelName, artikelCode, menge, klasse, faelligAm, notiz } = req.body || {};
+    const art = (req.body && req.body.art) === 'ausgabe' ? 'ausgabe' : 'ausleihe';
     if (!artikelId) return res.status(400).json({ error: 'Es fehlt der Artikel.' });
 
     // Ein Gerät kann nicht zweimal gleichzeitig verliehen sein. Das ist keine
     // Formalität: sonst zeigt die Liste zwei Entleiher für dasselbe Stück, und
     // niemand weiß, wer es wirklich hat.
-    const laeuft = db.listAusleihen().find(a => a.artikelId === artikelId && !a.zurueckAm);
-    if (laeuft) {
-      return res.status(409).json({
-        error: `Der Artikel ist bereits an ${laeuft.benutzerName} ausgeliehen (seit ${String(laeuft.ausgeliehenAm).slice(0, 10)}).`,
-      });
+    //
+    // Für Ausgaben gilt das NICHT: dieselbe Sorte Widerstände kann am selben
+    // Tag an drei Klassen gehen.
+    if (art === 'ausleihe') {
+      const laeuft = db.listAusleihen()
+        .find(a => a.artikelId === artikelId && (a.art || 'ausleihe') === 'ausleihe' && !a.zurueckAm);
+      if (laeuft) {
+        return res.status(409).json({
+          error: `Der Artikel ist bereits an ${laeuft.benutzerName} ausgeliehen (seit ${String(laeuft.ausgeliehenAm).slice(0, 10)}).`,
+        });
+      }
     }
 
     const eintrag = {
       id: crypto.randomUUID(),
+      art,
       artikelId,
       // Bezeichnung und Kennung werden MITGESCHRIEBEN, nicht nur verwiesen:
       // die Ausleihliste muss auch dann lesbar bleiben, wenn Homebox gerade
@@ -65,7 +92,8 @@ module.exports = function createAusleiheRouter(broadcast) {
       klasse: String(klasse || '').trim(),
       notiz: String(notiz || '').trim(),
       ausgeliehenAm: nowIso(),
-      faelligAm: faelligAm || '',
+      // Eine Ausgabe hat keine Frist — sie kommt ja nicht zurück.
+      faelligAm: art === 'ausleihe' ? (faelligAm || '') : '',
       zurueckAm: '',
       zurueckVon: '',
       erstelltAm: nowIso(),
@@ -80,6 +108,9 @@ module.exports = function createAusleiheRouter(broadcast) {
     const a = db.getAusleihe(req.params.id);
     if (!a) return res.status(404).json({ error: 'Ausleihe nicht gefunden.' });
     if (a.zurueckAm) return res.status(409).json({ error: 'Diese Ausleihe ist schon zurückgebucht.' });
+    if ((a.art || 'ausleihe') === 'ausgabe') {
+      return res.status(409).json({ error: 'Das war eine Ausgabe — sie kommt nicht zurück. Eingegangenes Material bitte als Zugang buchen.' });
+    }
 
     // Zurücknehmen darf jeder Angemeldete, nicht nur der Entleiher: das Gerät
     // steht im Zweifel wieder im Schrank, und wer es einräumt, ist selten der,

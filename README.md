@@ -105,6 +105,24 @@ rechnen kann Homebox nicht — die Nachbestell-Liste geht deshalb serverseitig
 einmal durch den Bestand und hält das Ergebnis 60 Sekunden vor. Jeder
 Schreibvorgang verwirft diesen Merker, damit eine Entnahme sofort auftaucht.
 
+### Demonstratoren und Verbrauchsmaterial
+
+Die Schule lagert zweierlei, und beides wird anders herausgegeben:
+
+| | erkannt an | Vorgang | Bestand |
+|---|---|---|---|
+| **Demonstrator** | Homebox-Tag (Vorgabe `Demonstrator`) | **Ausleihe** mit Frist und Rückgabe | bleibt unverändert |
+| **Verbrauchsmaterial** | alles ohne diesen Tag | **Ausgabe** an eine Klasse, keine Rückgabe | wird abgebucht |
+
+Der Tag wird **in Homebox** angelegt und dort den Geräten zugewiesen — auch
+mehreren auf einmal. Welcher Tag gilt, steht unter Einstellungen → Allgemein.
+Bewusst kein eigenes Feld: ein Tag ist in Homebox' Oberfläche sichtbar und
+bequem zu vergeben.
+
+Demonstratoren haben einen eigenen Menüpunkt. Dort zählt anderes als in der
+Artikelsuche — ob das Gerät da ist und ob es heil ist, nicht wie viele Stück
+im Fach liegen.
+
 ### Ausleihe
 
 Eine Ausleihe **verändert den Bestand nicht**. Ein Demonstrator, der im

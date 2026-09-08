@@ -16,9 +16,13 @@
       // Kurzkennungen für QR-Etiketten: A-1 für Artikel, O-1 für Lagerorte.
       // Der Zähler wandert beim Vergeben hoch (Phase 3).
       kennung: { artikelNaechste: 1, ortNaechste: 1 },
-      // Klassen/Gruppen für die Ausleihe (Phase 4). Frei pflegbar, weil sich
-      // die Klassenbezeichnungen jedes Schuljahr ändern.
+      // Klassen/Gruppen für Ausleihe und Ausgabe. Frei pflegbar, weil sich die
+      // Klassenbezeichnungen jedes Schuljahr ändern.
       klassen: [],
+      // Homebox-Tag, an dem Schuldemonstratoren erkannt werden. Bewusst kein
+      // eigenes Feld: Tags sind auch in Homebox' Oberfläche sichtbar und lassen
+      // sich dort bequem an vorhandene Artikel vergeben.
+      demonstratorMarke: 'Demonstrator',
       schemaVersion: 1,
     };
   }
@@ -31,7 +35,23 @@
     const out = { ...d, ...(s || {}) };
     out.kennung = { ...d.kennung, ...((s && s.kennung) || {}) };
     if (!Array.isArray(out.klassen)) out.klassen = [];
+    // Ein leerer Markenname würde jeden Artikel zum Demonstrator machen —
+    // dann lieber auf die Voreinstellung zurückfallen.
+    if (!String(out.demonstratorMarke || '').trim()) out.demonstratorMarke = d.demonstratorMarke;
     return out;
+  }
+
+  // Ist dieser Artikel ein Schuldemonstrator? Getragen wird das von einem
+  // Homebox-Tag; welcher es ist, steht in den Einstellungen.
+  //
+  // ACHTUNG: Listenantworten von Homebox sind Kurzfassungen und tragen die
+  // Marken nicht immer mit. Wer hier `false` bekommt, weiß deshalb nur
+  // „nicht erkennbar" — nicht sicher „ist keiner". Für Entscheidungen mit
+  // Folgen (Ausleihe anbieten) immer den DETAIL-Datensatz verwenden.
+  function istDemonstrator(artikel, markeName) {
+    const n = String(markeName || '').trim().toLowerCase();
+    if (!n || !artikel) return false;
+    return (artikel.marken || []).some(m => String(m.name || '').trim().toLowerCase() === n);
   }
 
   // Aus der flachen Ortsliste (jeder Eintrag kennt seine elternId) einen Baum
@@ -171,5 +191,6 @@
     ortBaum, ortPfad,
     codeArt,
     LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
+    istDemonstrator,
   };
 })();

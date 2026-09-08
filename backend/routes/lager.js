@@ -71,6 +71,13 @@ module.exports = function createLagerRouter() {
     res.json(await homebox.nachbestellung());
   }));
 
+  // Artikel einer Marke — die Schule trennt damit Demonstratoren von Bauteilen.
+  // Der Markenname kommt aus den App-Einstellungen, nicht aus dem Code: welcher
+  // Tag benutzt wird, entscheidet die Schule.
+  r.get('/marke/:name', fang(async (req, res) => {
+    res.json(await homebox.nachMarke(req.params.name));
+  }));
+
   r.get('/orte', fang(async (_req, res) => res.json(await homebox.orte())));
   r.get('/orte/:id', fang(async (req, res) => {
     const o = await homebox.ortHolen(req.params.id);
