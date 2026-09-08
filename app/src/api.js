@@ -151,7 +151,7 @@
   const ausleiheLoeschen = (id) => jsonFetch(`/api/ausleihe/${encodeURIComponent(id)}`, { method: 'DELETE' });
   const listDefekte = (alle) => jsonFetch('/api/ausleihe/defekte' + (alle ? '?alle=1' : ''));
   const defektMelden = (d) => jsonFetch('/api/ausleihe/defekte', { method: 'POST', body: d });
-  const defektBehoben = (id) => jsonFetch(`/api/ausleihe/defekte/${encodeURIComponent(id)}/behoben`, { method: 'POST' });
+  const defektBehoben = (id, notiz) => jsonFetch(`/api/ausleihe/defekte/${encodeURIComponent(id)}/behoben`, { method: 'POST', body: { notiz: notiz || '' } });
 
   // Datei-Upload läuft NICHT über jsonFetch: bei multipart muss der Browser den
   // Content-Type samt Grenzmarke selbst setzen. Wer ihn von Hand setzt, macht

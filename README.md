@@ -184,9 +184,22 @@ aber nicht blockiert: manchmal ist die Dopplung gewollt, manchmal ist sie genau
 der Fehler, den man sucht. MAC-Adressen werden vor dem Vergleich vereinheitlicht
 (`00-1B-…`, `001b…` und `00:1b:…` sind dasselbe Gerät).
 
+### Wartung
+
+Der Menüpunkt **Wartung** listet alle offenen Defektmeldungen — **die älteste
+zuoberst**, denn das ist die, die vergessen wurde. Von dort aus wird auch
+repariert gemeldet, mit optionaler Notiz, was gemacht wurde. Beim nächsten
+Ausfall desselben Geräts ist genau das die Frage.
+
+Die Karte **„Häufig defekt"** zeigt Geräte mit mindestens drei Meldungen in den
+letzten zwölf Monaten. Diese Frage beantwortet keine Einzelmeldung, sondern nur
+die Zusammenschau — und sie entscheidet zwischen Reparatur und Ersatz.
+
+Ist ein defektes Gerät gerade verliehen, steht das an der Meldung: Das ist der
+Fall, in dem man zum Hörer greift.
+
 **Defekt-Historie:** Behobene Meldungen verschwinden nicht, sondern bleiben am
-Gerät stehen. Ein Gerät, das dreimal im Jahr ausfällt, ist ein Fall für Ersatz
-und nicht für die vierte Reparatur — die Kopfzeile nennt deshalb die Anzahl.
+Gerät stehen — mit dem, was repariert wurde.
 
 > **Gerätepasswörter werden im Klartext gespeichert** (so entschieden). Sie sind
 > nur angemeldet sichtbar und in der Oberfläche maskiert — aber **jede nächtliche

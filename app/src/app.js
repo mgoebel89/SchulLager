@@ -22,6 +22,7 @@
     ] },
     { label: 'Ausgabe', items: [
       { path: '/ausleihe', label: 'Ausleihe', icon: 'hand', angemeldet: true },
+      { path: '/wartung', label: 'Wartung', icon: 'werkzeug', angemeldet: true },
       { path: '/etiketten', label: 'Etiketten', icon: 'tag' },
     ] },
     { footer: true, items: [
@@ -39,6 +40,7 @@
     scan: '<path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><path d="M4 12h16"/>',
     hand: '<path d="M8 13V5a1.5 1.5 0 013 0v6M11 11V4a1.5 1.5 0 013 0v7M14 11V6a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a5 5 0 01-5-5v-3l-1.5-1.5a1.5 1.5 0 012-2L8 13"/>',
     tag: '<path d="M3 11V4a1 1 0 011-1h7l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    werkzeug: '<path d="M14.7 6.3a4 4 0 01-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 015.4-5.4l-2.5 2.5-1.4-1.4z"/>',
     liste: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
     cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 11.2a2 2 0 002 1.6h7.8a2 2 0 002-1.6L21 7H6"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
@@ -202,6 +204,7 @@
     if (path === '/netz') return SL.views.renderNetz(mount);
     if (path === '/import') return SL.views.renderImport(mount);
     if (path === '/inventur') return SL.views.renderInventur(mount, params);
+    if (path === '/wartung') return SL.views.renderWartung(mount, params);
     if (path === '/scannen') return SL.views.renderScannen(mount);
     if (path === '/neu') return SL.views.renderNeuaufnahme(mount, params);
     if (path === '/nachbestellung') return SL.views.renderNachbestellung(mount);

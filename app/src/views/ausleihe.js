@@ -333,7 +333,12 @@
         ]),
       ]));
     }
-    return karte(`Defekt gemeldet (${defekte.length})`, box);
+    return karte(`Defekt gemeldet (${defekte.length})`, [
+      box,
+      // Verwaltet werden Defekte in der Wartungsansicht — hier stehen sie nur,
+      // weil ein kaputtes Gerät die Ausleihe betrifft.
+      el('div', { class: 'btn-reihe' }, [el('a', { class: 'btn btn-sm', href: '#/wartung' }, 'Zur Wartungsübersicht')]),
+    ]);
   }
 
   // --- Dialoge, von der Artikelansicht aus benutzt --------------------------

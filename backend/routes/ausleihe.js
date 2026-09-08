@@ -170,8 +170,12 @@ module.exports = function createAusleiheRouter(broadcast) {
   r.post('/defekte/:id/behoben', (req, res) => {
     const d = db.getDefekt(req.params.id);
     if (!d) return res.status(404).json({ error: 'Meldung nicht gefunden.' });
+    if (d.behobenAm) return res.status(409).json({ error: 'Diese Meldung ist bereits erledigt.' });
     d.behobenAm = nowIso();
     d.behobenVon = req.benutzer.name;
+    // Was wurde gemacht? Beim nächsten Ausfall desselben Geräts ist genau das
+    // die Frage — und ohne Notiz beginnt jede Reparatur wieder bei null.
+    d.behebungNotiz = String((req.body || {}).notiz || '').trim();
     d.lastModifiedAt = nowIso();
     db.saveDefekt(d);
     broadcast({ type: 'defekt:save', defekt: d, origin: req.header('x-client-id') || '' });

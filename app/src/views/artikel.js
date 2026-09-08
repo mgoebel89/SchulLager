@@ -380,14 +380,9 @@
       el('div', { class: 'btn-reihe' }, [
         el('button', {
           class: 'btn btn-sm', type: 'button',
-          onclick: async () => {
-            try {
-              await SL.api.defektBehoben(defekt.id);
-              SL.ui.toast('Als repariert vermerkt.');
-              neuLaden();
-            } catch (e) { SL.ui.toast(e.message || 'Das hat nicht geklappt.', 4500); }
-          },
+          onclick: () => SL.views.repariertDialog(defekt),
         }, 'Repariert'),
+        el('a', { class: 'btn btn-sm', href: '#/wartung' }, 'Wartungsübersicht'),
       ]),
     ]);
   }
