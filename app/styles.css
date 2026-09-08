@@ -873,3 +873,8 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
 /* Zeitraum-Auswahl über der Ausgabenliste */
 .ausgaben-filter { margin-bottom: 10px; }
 .ausgaben-filter .inp { flex: 0 0 auto; width: auto; }
+
+/* Filterleiste über der Geräteliste. `.chip` ist in dieser Designsprache ein
+   Knopf; als Link braucht er die Textauszeichnung zurückgenommen. */
+.geraete-filter { margin: 0 0 12px; }
+.geraete-filter a.chip { text-decoration: none; }

@@ -25,8 +25,10 @@
     }
 
     const zustand = { ortId: params.ortId || '', ortPfad: '', foto: null };
-    // Aus dem Menüpunkt „Demonstratoren" heraus ist die Sorte schon klar.
-    let istDemo = params.demo === '1';
+    // Aus dem Menüpunkt „Geräte" heraus ist die Sorte schon klar.
+    // '' = Verbrauchsmaterial, sonst 'demonstrator' oder 'netzgeraet'.
+    let art = ['demonstrator', 'netzgeraet'].includes(params.art) ? params.art
+      : (params.demo === '1' ? 'demonstrator' : '');
 
     const name = input({ autocomplete: 'off', placeholder: 'z. B. Widerstand 10 kΩ' });
     const menge = input({ type: 'number', min: '0', value: '1', inputmode: 'numeric' });
@@ -47,19 +49,26 @@
       }
     }).catch(() => { /* ohne Vorschläge tippt man den Namen eben selbst */ });
 
-    // Demonstrator oder Verbrauchsmaterial? Entscheidet, ob der Artikel den
-    // Homebox-Tag bekommt — und damit, ob er später ausleihbar ist.
-    const markeName = SL.store.state.settings.demonstratorMarke || 'Demonstrator';
-    const demoBox = el('input', {
-      type: 'checkbox', class: 'chk', checked: istDemo,
-      // Ein Demonstrator ist ein Einzelstück: Anzahl und Mindestbestand sind
-      // dort sinnlose Fragen und verschwinden.
-      onchange: (e) => {
-        istDemo = e.target.checked;
-        mengeZeile.hidden = istDemo;
-        mindestZeile.hidden = istDemo;
-      },
-    });
+    // Welche Sorte wird angelegt? Entscheidet, welchen Homebox-Tag der Artikel
+    // bekommt — und damit, ob er ausleihbar ist und Netzangaben tragen kann.
+    const st = SL.store.state.settings;
+    const artWahl = SL.ui.select([
+      { wert: '', label: 'Verbrauchsmaterial (wird entnommen und ausgegeben)' },
+      { wert: 'demonstrator', label: `Demonstrator (Tag „${st.demonstratorMarke}", ausleihbar)` },
+      { wert: 'netzgeraet', label: `Netzgerät / SPS-Board (Tag „${st.netzgeraetMarke}", ausleihbar)` },
+    ], art, (v) => {
+      art = v;
+      // Geräte sind Einzelstücke: Anzahl und Mindestbestand sind dort sinnlose
+      // Fragen und verschwinden.
+      const geraet = !!art;
+      mengeZeile.hidden = geraet;
+      mindestZeile.hidden = geraet;
+      netzHinweis.hidden = art !== 'netzgeraet';
+    }, { leerLabel: false });
+
+    const netzHinweis = el('p', { class: 'muted' },
+      'Nach dem Anlegen öffnet sich gleich die Eingabe für Profinet-Gerätename, IP und Seriennummer.');
+    netzHinweis.hidden = art !== 'netzgeraet';
 
     // Lagerort
     const ortAnzeige = el('span', { class: 'muted' }, 'nicht gewählt');
@@ -108,8 +117,9 @@
         // Der Tag muss existieren, bevor er vergeben werden kann — beim ersten
         // Demonstrator legt ihn der Server in Homebox an.
         let markenIds;
-        if (istDemo) {
-          const marke = await SL.api.markeAnlegen(markeName);
+        if (art) {
+          const marke = await SL.api.markeAnlegen(
+            art === 'netzgeraet' ? st.netzgeraetMarke : st.demonstratorMarke);
           markenIds = [marke.id];
         }
 
@@ -117,10 +127,10 @@
           name: name.value.trim(),
           // Ein Demonstrator ist ein Einzelstück; die Mengenfrage stellt sich
           // dort nicht und das Feld ist ausgeblendet.
-          menge: istDemo ? 1 : Math.max(0, parseInt(menge.value, 10) || 0),
+          menge: art ? 1 : Math.max(0, parseInt(menge.value, 10) || 0),
           ortId: zustand.ortId || undefined,
           barcode: barcode.value.trim() || undefined,
-          mindestbestand: (istDemo || mindest.value === '') ? undefined : Math.max(0, parseInt(mindest.value, 10) || 0),
+          mindestbestand: (art || mindest.value === '') ? undefined : Math.max(0, parseInt(mindest.value, 10) || 0),
           beschreibung: beschreibung.value || undefined,
           hersteller: hersteller.value.trim() || undefined,
           kaufpreis: kaufpreis.value === '' ? undefined : Number(kaufpreis.value),
@@ -146,7 +156,11 @@
         toast(fotoFehler
           ? `Artikel angelegt — aber das Foto ging nicht durch: ${fotoFehler}`
           : 'Artikel angelegt.', fotoFehler ? 6000 : 2200);
-        location.hash = `#/artikel?id=${encodeURIComponent(a.id)}`;
+        // Bei einem Netzgerät fehlt jetzt genau das, wofür man es angelegt hat:
+        // die Netzangaben. Also gleich dorthin, statt sie im Detail suchen zu
+        // lassen.
+        location.hash = `#/artikel?id=${encodeURIComponent(a.id)}`
+          + (art === 'netzgeraet' ? '&netz=1' : '');
       } catch (e) {
         toast(e.message || 'Das Anlegen hat nicht geklappt.', 5000);
         speichern.disabled = false;
@@ -155,22 +169,21 @@
     });
 
     mount.appendChild(el('div', { class: 'toolbar' }, [
-      el('h1', {}, istDemo ? 'Demonstrator aufnehmen' : 'Artikel aufnehmen'),
+      el('h1', {}, art === 'netzgeraet' ? 'Netzgerät aufnehmen'
+        : art === 'demonstrator' ? 'Demonstrator aufnehmen' : 'Artikel aufnehmen'),
     ]));
 
     const mengeZeile = feld('Anzahl', menge);
     const mindestZeile = feld('Mindestbestand', mindest);
-    mengeZeile.hidden = istDemo;
-    mindestZeile.hidden = istDemo;
+    mengeZeile.hidden = !!art;
+    mindestZeile.hidden = !!art;
 
     mount.appendChild(karte(null, [
       params.barcode
         ? el('p', { class: 'muted' }, `Gescannter Barcode ${params.barcode} ist übernommen.`)
         : null,
-      el('label', { class: 'feld feld-breit' }, [
-        el('span', { class: 'feld-label' }, 'Art'),
-        el('span', {}, [demoBox, ` Schuldemonstrator (Tag „${markeName}", ausleihbar)`]),
-      ]),
+      feld('Art', artWahl),
+      netzHinweis,
       feld('Bezeichnung', name),
       mengeZeile,
       feld('Lagerort', el('div', { class: 'wahl-zeile' }, [ortKnopf, ortAnzeige])),

@@ -31,6 +31,7 @@
     kacheln.appendChild(kachel('Scannen', 'Barcode oder QR mit der Kamera lesen', '#/scannen', true));
     kacheln.appendChild(kachel('Lagerorte', 'Räume, Schränke und Fächer durchgehen', '#/orte', true));
     if (SL.store.darfBuchen()) {
+      kacheln.appendChild(kachel('Geräte', 'Demonstratoren und Netzgeräte — verfügbar oder verliehen?', '#/geraete', true));
       kacheln.appendChild(kachel('Aufnehmen', 'Neuen Artikel anlegen, Barcode scannen', '#/neu', true));
       kacheln.appendChild(kachel('Ausleihe', 'Wer hat welches Gerät, und was ist überfällig?', '#/ausleihe', true));
       kacheln.appendChild(kachel('Nachbestellen', 'Was ist unter den Mindestbestand gerutscht?', '#/nachbestellung', true));

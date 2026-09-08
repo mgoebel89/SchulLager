@@ -23,6 +23,10 @@
       // eigenes Feld: Tags sind auch in Homebox' Oberfläche sichtbar und lassen
       // sich dort bequem an vorhandene Artikel vergeben.
       demonstratorMarke: 'Demonstrator',
+      // Einzelne Netzgeräte (SPS-Boards ohne übergeordneten Demonstrator).
+      // Eigener Tag, weil ein nacktes Board kein Demonstrator ist — aber
+      // ebenfalls ausleihbar und mit eigenem Raum.
+      netzgeraetMarke: 'Netzgerät',
       schemaVersion: 1,
     };
   }
@@ -38,6 +42,7 @@
     // Ein leerer Markenname würde jeden Artikel zum Demonstrator machen —
     // dann lieber auf die Voreinstellung zurückfallen.
     if (!String(out.demonstratorMarke || '').trim()) out.demonstratorMarke = d.demonstratorMarke;
+    if (!String(out.netzgeraetMarke || '').trim()) out.netzgeraetMarke = d.netzgeraetMarke;
     return out;
   }
 
@@ -53,6 +58,23 @@
     if (!n || !artikel) return false;
     return (artikel.marken || []).some(m => String(m.name || '').trim().toLowerCase() === n);
   }
+
+  // Welche Sorte Gerät ist das? '' heißt Verbrauchsmaterial.
+  //
+  // Beide Geräte-Sorten sind ausleihbar und können Netzangaben tragen; sie
+  // unterscheiden sich nur in der Einordnung. Ein SPS-Board ist kein
+  // Demonstrator — aber es steht in einem Raum und wird verliehen wie einer.
+  function geraeteArt(artikel, settings) {
+    const s = settings || {};
+    if (istDemonstrator(artikel, s.demonstratorMarke)) return 'demonstrator';
+    if (istDemonstrator(artikel, s.netzgeraetMarke)) return 'netzgeraet';
+    return '';
+  }
+
+  const GERAET_LABEL = { demonstrator: 'Demonstrator', netzgeraet: 'Netzgerät' };
+
+  // Ausleihbar ist, was ein Gerät ist. Verbrauchsmaterial wird ausgegeben.
+  function istGeraet(artikel, settings) { return !!geraeteArt(artikel, settings); }
 
   // Aus der flachen Ortsliste (jeder Eintrag kennt seine elternId) einen Baum
   // bauen. Homebox liefert die Verschachtelung als Bezug, nicht als Struktur.
@@ -191,6 +213,6 @@
     ortBaum, ortPfad,
     codeArt,
     LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
-    istDemonstrator,
+    istDemonstrator, geraeteArt, istGeraet, GERAET_LABEL,
   };
 })();

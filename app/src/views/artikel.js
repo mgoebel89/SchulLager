@@ -13,7 +13,7 @@
   // zwischengespeichert: zwei Leute am selben Regal dürfen keine
   // unterschiedlichen Zahlen sehen.
   function renderArtikel(mount, params = {}) {
-    if (params.id) return detailAnzeigen(mount, params.id);
+    if (params.id) return detailAnzeigen(mount, params.id, params);
     return listeAnzeigen(mount, params);
   }
 
@@ -183,7 +183,7 @@
   }
 
   // --- Detail --------------------------------------------------------------
-  async function detailAnzeigen(mount, id) {
+  async function detailAnzeigen(mount, id, params = {}) {
     mount.appendChild(el('div', { class: 'toolbar' }, [
       el('a', { class: 'btn btn-sm', href: zurueckZiel() }, '‹ Zurück'),
       el('span', { class: 'spacer' }),
@@ -231,9 +231,11 @@
       defekt = defekte.find(x => x.artikelId === a.id && !x.behobenAm) || null;
     }
 
-    // Demonstrator oder Verbrauchsmaterial? Hier ist die Prüfung verlässlich:
-    // `a` ist der DETAIL-Datensatz und trägt die Marken vollständig.
-    const istDemo = SL.models.istDemonstrator(a, SL.store.state.settings.demonstratorMarke);
+    // Gerät (Demonstrator oder Netzgerät) oder Verbrauchsmaterial? Hier ist
+    // die Prüfung verlässlich: `a` ist der DETAIL-Datensatz und trägt die
+    // Marken vollständig — eine Listen-Kurzfassung täte das nicht.
+    const art = SL.models.geraeteArt(a, SL.store.state.settings);
+    const istDemo = !!art;
 
     if (defekt) behaelter.appendChild(defektHinweis(defekt, neuLaden));
     if (leihe) behaelter.appendChild(leihHinweis(leihe, neuLaden));
@@ -314,11 +316,18 @@
 
     if (a.notizen) behaelter.appendChild(karte('Notizen', el('p', {}, a.notizen)));
 
-    // Komponenten gibt es nur bei Demonstratoren — ein Widerstand hat keine
-    // SPS. Die Karte lädt selbst nach, damit die Artikelansicht nicht auf sie
-    // warten muss.
+    // Netzangaben gibt es nur bei Geräten — ein Widerstand hat keine SPS.
+    // Bei einem Netzgerät beschreiben sie das Gerät selbst, bei einem
+    // Demonstrator seine Einbauten; die Karte heißt deshalb unterschiedlich.
     if (istDemo && SL.store.darfBuchen()) {
-      behaelter.appendChild(await SL.views.komponentenKarte(a, neuLaden));
+      behaelter.appendChild(await SL.views.komponentenKarte(a, neuLaden, art));
+      behaelter.appendChild(await defektHistorie(a));
+      // Frisch angelegtes Netzgerät: die Eingabe gleich öffnen. Ohne das
+      // müsste man nach dem Anlegen erst suchen, wofür man es angelegt hat.
+      if (params.netz === '1') {
+        SL.app.adresseErsetzen(`#/artikel?id=${encodeURIComponent(a.id)}`);
+        SL.views.komponenteAnlegen(a, neuLaden);
+      }
     }
 
     if (!SL.store.darfBuchen()) {
@@ -381,6 +390,63 @@
         }, 'Repariert'),
       ]),
     ]);
+  }
+
+  // --- Defekt-Historie ------------------------------------------------------
+  // Nicht nur der aktuelle Defekt zählt, sondern die Vorgeschichte: ein Gerät,
+  // das dreimal im Jahr ausfällt, ist ein Fall für Ersatz und nicht für die
+  // vierte Reparatur. Deshalb bleiben behobene Meldungen stehen, statt beim
+  // Abhaken zu verschwinden.
+  async function defektHistorie(a) {
+    const box = el('div');
+    const details = el('details', { class: 'aufklapp' }, [
+      el('summary', {}, 'Defekt-Historie'),
+      box,
+    ]);
+    const k = karte(null, details);
+    box.appendChild(el('p', { class: 'muted' }, 'Wird geladen…'));
+
+    let alle = [];
+    try {
+      alle = (await SL.api.listDefekte(true)).filter(d => d.artikelId === a.id);
+    } catch (e) {
+      box.innerHTML = '';
+      box.appendChild(el('p', { class: 'anmeldung-fehler' }, e.message || ''));
+      return k;
+    }
+
+    box.innerHTML = '';
+    if (!alle.length) {
+      box.appendChild(el('p', { class: 'muted' }, 'Für dieses Gerät wurde noch nie ein Defekt gemeldet.'));
+      return k;
+    }
+
+    alle.sort((x, y) => String(y.gemeldetAm).localeCompare(String(x.gemeldetAm)));
+    const offen = alle.filter(d => !d.behobenAm).length;
+
+    // Die Kopfzeile beantwortet die Frage, für die man die Historie aufmacht:
+    // wie oft war das Ding schon kaputt?
+    details.querySelector('summary').textContent =
+      `Defekt-Historie (${alle.length} ${alle.length === 1 ? 'Meldung' : 'Meldungen'}`
+      + (offen ? `, ${offen} offen` : '') + ')';
+
+    const liste = el('div', { class: 'liste' });
+    for (const d of alle) {
+      liste.appendChild(el('div', { class: 'eintrag' }, [
+        el('div', { class: 'benutzer-kopf' }, [
+          el('span', { class: 'ampel ' + (d.behobenAm ? 'ampel-ok' : 'ampel-faellig') },
+            d.behobenAm ? 'behoben' : 'offen'),
+          el('span', { class: 'muted' }, SL.ui.formatDatum(String(d.gemeldetAm).slice(0, 10))),
+        ]),
+        el('div', {}, d.notiz),
+        el('div', { class: 'muted' }, [
+          `gemeldet von ${d.gemeldetVon}`,
+          d.behobenAm ? ` · behoben am ${SL.ui.formatDatum(String(d.behobenAm).slice(0, 10))}${d.behobenVon ? ' von ' + d.behobenVon : ''}` : '',
+        ].join('')),
+      ]));
+    }
+    box.appendChild(liste);
+    return k;
   }
 
   // --- Buchen --------------------------------------------------------------

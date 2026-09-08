@@ -19,13 +19,17 @@
   const TYPEN = ['SPS', 'HMI / Panel', 'IO-Modul', 'Switch', 'Antrieb / Umrichter', 'Sensor', 'Netzteil', 'Rechner', 'Sonstiges'];
 
   // --- Karte im Artikeldetail ----------------------------------------------
-  async function komponentenKarte(demonstrator, neuLaden) {
+  async function komponentenKarte(demonstrator, neuLaden, art) {
+    // Bei einem Netzgerät beschreiben die Angaben das Gerät SELBST (ein SPS-
+    // Board ist seine eigene Netzkomponente), bei einem Demonstrator seine
+    // Einbauten. Ein gemeinsamer Titel wäre in einem der beiden Fälle falsch.
+    const netzgeraet = art === 'netzgeraet';
     const box = el('div');
-    const k = karte('Komponenten', box, {
+    const k = karte(netzgeraet ? 'Netzangaben' : 'Komponenten', box, {
       aktion: el('button', {
         class: 'btn btn-sm', type: 'button',
-        onclick: () => dialog(demonstrator, null, neuLaden),
-      }, '+ Komponente'),
+        onclick: () => dialog(demonstrator, null, neuLaden, netzgeraet),
+      }, netzgeraet ? '+ Netzangaben' : '+ Komponente'),
     });
     box.appendChild(el('p', { class: 'muted' }, 'Wird geladen…'));
 
@@ -40,18 +44,19 @@
 
     box.innerHTML = '';
     if (!liste.length) {
-      box.appendChild(el('p', { class: 'muted' },
-        'Noch keine Komponenten erfasst. Hier gehören die Geräte hinein, die im Netz hängen — '
-        + 'mit Profinet-Gerätename, IP und Seriennummer.'));
+      box.appendChild(el('p', { class: 'muted' }, netzgeraet
+        ? 'Noch keine Netzangaben erfasst — Profinet-Gerätename, IP und Seriennummer gehören hierher.'
+        : 'Noch keine Komponenten erfasst. Hier gehören die Geräte hinein, die im Netz hängen — '
+          + 'mit Profinet-Gerätename, IP und Seriennummer.'));
       return k;
     }
     const l = el('div', { class: 'liste' });
-    for (const komp of liste) l.appendChild(zeile(komp, demonstrator, neuLaden));
+    for (const komp of liste) l.appendChild(zeile(komp, demonstrator, neuLaden, netzgeraet));
     box.appendChild(l);
     return k;
   }
 
-  function zeile(komp, demonstrator, neuLaden) {
+  function zeile(komp, demonstrator, neuLaden, netzgeraet) {
     const netz = [
       komp.profinetName ? `Gerätename ${komp.profinetName}` : '',
       komp.ip ? `IP ${komp.ip}${komp.subnetz ? ' / ' + komp.subnetz : ''}` : '',
@@ -77,7 +82,7 @@
       komp.notiz ? el('div', { class: 'muted' }, komp.notiz) : null,
       komp.passwort ? zugangZeile(komp) : null,
       el('div', { class: 'btn-reihe' }, [
-        el('button', { class: 'btn btn-sm', type: 'button', onclick: () => dialog(demonstrator, komp, neuLaden) }, 'Bearbeiten'),
+        el('button', { class: 'btn btn-sm', type: 'button', onclick: () => dialog(demonstrator, komp, neuLaden, netzgeraet) }, 'Bearbeiten'),
         el('button', {
           class: 'btn btn-sm btn-danger', type: 'button',
           onclick: async () => {
@@ -115,7 +120,7 @@
   }
 
   // --- Dialog ---------------------------------------------------------------
-  function dialog(demonstrator, komp, neuLaden) {
+  function dialog(demonstrator, komp, neuLaden, netzgeraet) {
     const f = {};
     const mk = (schluessel, attrs) => {
       f[schluessel] = input({ value: (komp && komp[schluessel]) || '', autocomplete: 'off', ...(attrs || {}) });
@@ -130,7 +135,7 @@
     notiz.value = (komp && komp.notiz) || '';
 
     const inhalt = [
-      feld('Bezeichnung', mk('name', { placeholder: 'z. B. SPS Hauptsteuerung' })),
+      feld('Bezeichnung', mk('name', { placeholder: netzgeraet ? 'z. B. S7-1200 CPU 1214C' : 'z. B. SPS Hauptsteuerung' })),
       feld('Art', typ),
       abschnitt('Netz (Profinet)'),
       feld('Profinet-Gerätename (NameOfStation)', mk('profinetName', { placeholder: 'z. B. sps-hydraulik-01', autocapitalize: 'none' })),
@@ -153,7 +158,12 @@
       feld('Notiz', notiz),
     ];
 
-    const dlg = SL.ui.modal(komp ? `Komponente: ${komp.name}` : `Komponente zu ${demonstrator.name}`, inhalt, {
+    // Bei einem Netzgerät beschreibt der Eintrag das Gerät selbst — „Komponente
+    // zu …" wäre dort schlicht falsch.
+    const titel = komp
+      ? `${netzgeraet ? 'Netzangaben' : 'Komponente'}: ${komp.name}`
+      : `${netzgeraet ? 'Netzangaben zu' : 'Komponente zu'} ${demonstrator.name}`;
+    const dlg = SL.ui.modal(titel, inhalt, {
       fuss: [
         el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
         el('button', {
@@ -287,5 +297,7 @@
   }
 
   SL.views.komponentenKarte = komponentenKarte;
+  // Von der Neuaufnahme aus: gleich nach dem Anlegen eines Netzgeräts.
+  SL.views.komponenteAnlegen = (artikel, neuLaden) => dialog(artikel, null, neuLaden, true);
   SL.views.renderNetz = renderNetz;
 })();

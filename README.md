@@ -123,10 +123,25 @@ Demonstratoren haben einen eigenen Menüpunkt. Dort zählt anderes als in der
 Artikelsuche — ob das Gerät da ist und ob es heil ist, nicht wie viele Stück
 im Fach liegen.
 
-### Komponenten eines Demonstrators (Profinet)
+### Geräte: Demonstratoren und einzelne Netzgeräte
 
-Viele Demonstratoren bestehen aus mehreren Geräten; die im Profinet hängenden —
-meist SPS-Baugruppen — bleiben dem Demonstrator fest zugeordnet. Erfasst werden
+Ausleihbar sind **Geräte**, erkannt an einem von zwei Homebox-Tags:
+
+| | Tag (Vorgabe) | typisch |
+|---|---|---|
+| **Demonstrator** | `Demonstrator` | Trainer aus mehreren Komponenten |
+| **Netzgerät** | `Netzgerät` | einzelnes SPS-Board, das nur im Netz hängt |
+
+Beide sind eigene Artikel in Homebox, stehen in einem Raum, sind ausleihbar und
+können Netzangaben tragen. Der Unterschied ist die Einordnung — ein nacktes
+SPS-Board ist kein Demonstrator. Der Menüpunkt **Geräte** zeigt beide, oben
+umschaltbar. Beim Anlegen eines Netzgeräts öffnet sich direkt die Eingabe der
+Netzangaben.
+
+### Netzangaben und Komponenten (Profinet)
+
+Bei einem Demonstrator beschreiben die Einträge seine Einbauten, bei einem
+Netzgerät das Gerät selbst. Erfasst werden
 **Profinet-Gerätename (NameOfStation)**, IP, Subnetz, MAC, Hersteller,
 Bestellnummer, Seriennummer, UUID, Firmware und Steckplatz.
 
@@ -139,6 +154,10 @@ vergebene IPs, MACs und Gerätenamen. Beim Speichern wird ebenfalls gewarnt,
 aber nicht blockiert: manchmal ist die Dopplung gewollt, manchmal ist sie genau
 der Fehler, den man sucht. MAC-Adressen werden vor dem Vergleich vereinheitlicht
 (`00-1B-…`, `001b…` und `00:1b:…` sind dasselbe Gerät).
+
+**Defekt-Historie:** Behobene Meldungen verschwinden nicht, sondern bleiben am
+Gerät stehen. Ein Gerät, das dreimal im Jahr ausfällt, ist ein Fall für Ersatz
+und nicht für die vierte Reparatur — die Kopfzeile nennt deshalb die Anzahl.
 
 > **Gerätepasswörter werden im Klartext gespeichert** (so entschieden). Sie sind
 > nur angemeldet sichtbar und in der Oberfläche maskiert — aber **jede nächtliche

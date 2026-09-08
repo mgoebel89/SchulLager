@@ -13,7 +13,7 @@
     ] },
     { label: 'Lager', items: [
       { path: '/artikel', label: 'Artikel', icon: 'box' },
-      { path: '/demonstratoren', label: 'Demonstratoren', icon: 'geraet' },
+      { path: '/geraete', label: 'Geräte', icon: 'geraet' },
       { path: '/netz', label: 'Netzübersicht', icon: 'netz', angemeldet: true },
       { path: '/orte', label: 'Lagerorte', icon: 'pin' },
       { path: '/scannen', label: 'Scannen', icon: 'scan' },
@@ -193,7 +193,10 @@
     if (path === '/einstellungen') return SL.views.renderEinstellungen(mount, params);
     if (path === '/artikel') return SL.views.renderArtikel(mount, params);
     if (path === '/orte') return SL.views.renderOrte(mount, params);
-    if (path === '/demonstratoren') return SL.views.renderDemonstratoren(mount);
+    if (path === '/geraete') return SL.views.renderGeraete(mount, params);
+    // Alter Weg: die Ansicht hieß erst „Demonstratoren". Lesezeichen und
+    // gedruckte Etiketten sollen weiter funktionieren.
+    if (path === '/demonstratoren') { location.replace('#/geraete'); return; }
     if (path === '/netz') return SL.views.renderNetz(mount);
     if (path === '/scannen') return SL.views.renderScannen(mount);
     if (path === '/neu') return SL.views.renderNeuaufnahme(mount, params);

@@ -68,7 +68,7 @@
         el('p', {}, 'Zurzeit ist nichts ausgeliehen.'),
         el('p', { class: 'muted' },
           'Zum Ausleihen oben auf „+ Ausleihen" — oder das Gerät scannen und im Artikel „Ausleihen" wählen. '
-          + 'Ausgeliehen werden nur Demonstratoren; Verbrauchsmaterial wird entnommen und dabei auf Wunsch einer Klasse zugeschrieben.'),
+          + 'Ausgeliehen werden Geräte (Demonstratoren und Netzgeräte); Verbrauchsmaterial wird entnommen und dabei auf Wunsch einer Klasse zugeschrieben.'),
         el('div', { class: 'btn-reihe' }, [
           el('button', { class: 'btn btn-primary', type: 'button', onclick: () => geraetWaehlenUndAusleihen() }, '+ Ausleihen'),
         ]),
@@ -218,9 +218,10 @@
           artikel = await SL.api.lagerArtikel(treffer.id);
         } catch (_) { /* ohne Detail mit dem Treffer weiterarbeiten */ }
 
-        const marke = SL.store.state.settings.demonstratorMarke || 'Demonstrator';
-        if (!SL.models.istDemonstrator(artikel, marke)) {
-          keinDemonstrator(artikel, marke);
+        // Ausleihbar sind BEIDE Geräte-Sorten: Demonstratoren und einzelne
+        // Netzgeräte. Verbrauchsmaterial wird ausgegeben, nicht verliehen.
+        if (!SL.models.istGeraet(artikel, SL.store.state.settings)) {
+          keinDemonstrator(artikel);
           return;
         }
         ausleihenDialog(artikel, () => SL.app.router());
@@ -230,11 +231,12 @@
 
   // Kein Demonstrator: nicht einfach abweisen, sondern den richtigen Weg
   // anbieten. Die Ausgabe ist genau dafür da.
-  function keinDemonstrator(artikel, marke) {
+  function keinDemonstrator(artikel) {
+    const s = SL.store.state.settings;
     const m = SL.ui.modal('Nicht zum Ausleihen', el('div', {}, [
       el('p', {}, [
         el('strong', {}, artikel.name || '(Artikel)'),
-        ` trägt nicht den Tag „${marke}" und gilt damit als Verbrauchsmaterial.`,
+        ` trägt weder den Tag „${s.demonstratorMarke}" noch „${s.netzgeraetMarke}" und gilt damit als Verbrauchsmaterial.`,
       ]),
       el('p', { class: 'muted' },
         'Verbrauchsmaterial wird entnommen statt ausgeliehen — dabei lässt sich festhalten, '
