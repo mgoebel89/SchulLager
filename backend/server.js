@@ -23,6 +23,8 @@ const createLagerRouter = require('./routes/lager');
 const createAusleiheRouter = require('./routes/ausleihe');
 const createKomponentenRouter = require('./routes/komponenten');
 const createInventurRouter = require('./routes/inventur');
+const createBestellungenRouter = require('./routes/bestellungen');
+const createDokumenteRouter = require('./routes/dokumente');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -75,6 +77,14 @@ app.use('/api/komponenten', createKomponentenRouter(broadcast, require('./homebo
 
 // --- Inventur (Zähl-Läufe; schreibt erst beim Übernehmen nach Homebox) ---
 app.use('/api/inventur', createInventurRouter(broadcast, require('./homebox')));
+
+// --- Beschaffung: Bestellungen, Wareneingang, Rechnungen ---
+// Braucht Homebox (bucht den Eingang) UND Paperless (löst schwebende
+// Beleg-Uploads auf, sobald die Verarbeitung dort durch ist).
+app.use('/api/bestellungen', createBestellungenRouter(broadcast, require('./homebox'), require('./paperless')));
+
+// --- Dokumente in Paperless (Lieferscheine, Rechnungen) ---
+app.use('/api/dokumente', createDokumenteRouter());
 
 // --- App-Einstellungen ---
 // Lesen darf jeder Angemeldete (die Oberfläche braucht z. B. die Klassenliste),

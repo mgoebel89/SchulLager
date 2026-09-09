@@ -8,8 +8,9 @@
 # wird dort gesichert.
 #
 # ACHTUNG: Diese Sicherung enthält die an den Komponenten hinterlegten
-# GERÄTEPASSWÖRTER im Klartext (so entschieden). Die Dateien gehören deshalb
-# nicht auf eine offene Freigabe. Diese Sicherung allein stellt also kein Lager wieder her.
+# GERÄTEPASSWÖRTER im Klartext (so entschieden) — und seit Phase 6 außerdem den
+# PAPERLESS-TOKEN und das Homebox-Passwort aus der settings-Tabelle. Die Dateien
+# gehören deshalb nicht auf eine offene Freigabe. Diese Sicherung allein stellt also kein Lager wieder her.
 
 set -euo pipefail
 

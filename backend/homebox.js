@@ -579,10 +579,12 @@ const NACHBESTELL_TTL_MS = 60 * 1000;
 const MAX_DURCHGANG = 2000;
 let nachbestellCache = null;
 let herstellerCache = null;   // Deklaration hier, damit cacheVerwerfen() sie sicher kennt
+let lieferantenCache = null;
 
 function cacheVerwerfen() {
   nachbestellCache = null;
   herstellerCache = null;
+  lieferantenCache = null;
   // Eine Änderung kann eine Marke setzen oder nehmen — der Demonstrator-Merker
   // wäre sonst bis zu einer Minute falsch.
   markeCacheVerwerfen();
@@ -840,15 +842,16 @@ async function artikelLoeschen(id) {
   await api(artikelPfad(stil, id), { method: 'DELETE' });
 }
 
-// --- Hersteller-Vorschläge ------------------------------------------------
-// Beim Anlegen soll man den Hersteller nicht jedes Mal neu tippen. Homebox
-// kennt keine Liste der benutzten Hersteller — also einmal durch den Bestand
-// und zusammenzählen. Wie die Nachbestell-Liste eine teure Abfrage, deshalb
-// derselbe Merker.
-async function hersteller() {
-  if (herstellerCache && Date.now() - herstellerCache.zeit < NACHBESTELL_TTL_MS) {
-    return herstellerCache.daten;
-  }
+// --- Hersteller- und Lieferanten-Vorschläge -------------------------------
+// Beim Anlegen und beim Bestellen soll man Hersteller und Lieferant nicht
+// jedes Mal neu tippen. Homebox kennt keine Liste der benutzten Werte — also
+// einmal durch den Bestand und zusammenzählen. Wie die Nachbestell-Liste eine
+// teure Abfrage, deshalb derselbe Merker.
+//
+// Beide Listen entstehen im GLEICHEN Durchgang-Muster; unterschiedlich ist nur,
+// welches Rohfeld gelesen wird. Zwei Kopien derselben Schleife wären der
+// sicherste Weg, dass die eine später repariert wird und die andere nicht.
+async function namensVorschlaege(lesen) {
   const stil = await stilErmitteln();
   const listenPfad = artikelPfad(stil);
   const proSeite = 100;
@@ -859,7 +862,7 @@ async function hersteller() {
     const { eintraege, gesamt } = listeAus(await api(listenPfad, { params: { page: seite, pageSize: proSeite } }));
     if (!eintraege.length) break;
     for (const roh of eintraege) {
-      const h = String(roh.manufacturer || '').trim();
+      const h = String(lesen(roh) || '').trim();
       if (!h) continue;
       // Nach Kleinschreibung zusammenfassen, aber die erste gesehene
       // Schreibweise anzeigen — „Festo" und „festo" sind derselbe Hersteller.
@@ -872,8 +875,23 @@ async function hersteller() {
     if (geprueft >= MAX_DURCHGANG) break;
   }
 
-  const daten = [...zaehler.values()].sort((a, b) => b.anzahl - a.anzahl || a.name.localeCompare(b.name, 'de'));
+  return [...zaehler.values()].sort((a, b) => b.anzahl - a.anzahl || a.name.localeCompare(b.name, 'de'));
+}
+
+async function hersteller() {
+  if (herstellerCache && Date.now() - herstellerCache.zeit < NACHBESTELL_TTL_MS) return herstellerCache.daten;
+  const daten = await namensVorschlaege(roh => roh.manufacturer);
   herstellerCache = { zeit: Date.now(), daten };
+  return daten;
+}
+
+// Lieferanten für den Bestellkopf. Homebox hält den zuletzt benutzten Lieferanten
+// je Artikel in `purchaseFrom` — dieselbe Quelle, aus der die Beschaffungskarte
+// am Artikel liest.
+async function lieferanten() {
+  if (lieferantenCache && Date.now() - lieferantenCache.zeit < NACHBESTELL_TTL_MS) return lieferantenCache.daten;
+  const daten = await namensVorschlaege(roh => roh.purchaseFrom);
+  lieferantenCache = { zeit: Date.now(), daten };
   return daten;
 }
 
@@ -946,7 +964,7 @@ module.exports = {
   suchen, holen, beiBarcode, beiCode, beiFeld,
   orte, ortHolen, marken,
   anlegen, aktualisieren, bestandAendern,
-  nachbestellung, anhangHochladen, nachMarke,
+  nachbestellung, anhangHochladen, nachMarke, lieferanten,
   markeSicherstellen, ortAnlegen, hersteller,
   // für Tests
   _normArtikel: normArtikel,

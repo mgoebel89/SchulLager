@@ -11,6 +11,7 @@
 //   ausleihen             — wer hat was seit wann, bis wann        (Phase 4)
 //   defekte               — Gerät ist in Reparatur                 (Phase 4)
 //   inventuren            — Zähl-Läufe mit Soll/Ist                (Phase 5)
+//   bestellungen          — Beschaffung samt Wareneingang           (Phase 6)
 //   settings              — App-Einstellungen und Zugangsdaten
 //
 // Fachdaten liegen wie in den Schwesterprojekten als EIN JSON-Payload je Zeile.
@@ -104,6 +105,23 @@ db.exec(`
     last_modified TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_komponenten_modified ON komponenten(last_modified);
+
+  -- Bestellungen mit ihren Positionen und dem Wareneingang.
+  --
+  -- Positionen liegen IM Payload und nicht in einer eigenen Tabelle: eine
+  -- Bestellung ist ein Beleg, der als Ganzes gelesen, geändert und gedruckt
+  -- wird — nie einzeln nach Positionen durchsucht.
+  --
+  -- Artikelname, Bestellnummer und Preis werden MITGESCHRIEBEN, statt nur auf
+  -- Homebox zu verweisen. Zwei Gründe: die Liste muss lesbar bleiben, wenn
+  -- Homebox gerade nicht antwortet, und eine Abrechnung vom Mai darf sich
+  -- nicht ändern, weil im Oktober zu einem anderen Preis nachgekauft wurde.
+  CREATE TABLE IF NOT EXISTS bestellungen (
+    id            TEXT PRIMARY KEY,
+    payload       TEXT NOT NULL,
+    last_modified TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_bestellungen_modified ON bestellungen(last_modified);
 `);
 
 function nowIso() { return new Date().toISOString(); }
@@ -163,6 +181,9 @@ function makeConfigStore(key) {
 }
 const homeboxConfig = makeConfigStore('homebox');
 const druckerConfig = makeConfigStore('drucker');
+// Paperless: EIN Zugang für die ganze Schule, vom Admin gepflegt. Der Token
+// ist ein Geheimnis wie das Homebox-Passwort und verlässt den Server nicht.
+const paperlessConfig = makeConfigStore('paperless');
 
 // --- Benutzer -------------------------------------------------------------
 const BENUTZER_SPALTEN = `
@@ -264,6 +285,7 @@ const ausleihenStore = makePayloadStore('ausleihen');
 const defekteStore = makePayloadStore('defekte');
 const inventurenStore = makePayloadStore('inventuren');
 const komponentenStore = makePayloadStore('komponenten');
+const bestellungenStore = makePayloadStore('bestellungen');
 
 module.exports = {
   DATA_DIR, ATTACH_DIR,
@@ -271,6 +293,7 @@ module.exports = {
   getSettings, saveSettings,
   getHomeboxConfig: homeboxConfig.get, saveHomeboxConfig: homeboxConfig.save,
   getDruckerConfig: druckerConfig.get, saveDruckerConfig: druckerConfig.save,
+  getPaperlessConfig: paperlessConfig.get, savePaperlessConfig: paperlessConfig.save,
   listBenutzer, getBenutzer, getBenutzerMitHash, getBenutzerMitHashById,
   zaehleBenutzer, zaehleAdmins,
   insertBenutzer, updateBenutzer, setzePasswort, merkeLogin, deleteBenutzer,
@@ -283,4 +306,6 @@ module.exports = {
   saveInventur: inventurenStore.save, deleteInventur: inventurenStore.delete,
   listKomponenten: komponentenStore.list, getKomponente: komponentenStore.get,
   saveKomponente: komponentenStore.save, deleteKomponente: komponentenStore.delete,
+  listBestellungen: bestellungenStore.list, getBestellung: bestellungenStore.get,
+  saveBestellung: bestellungenStore.save, deleteBestellung: bestellungenStore.delete,
 };

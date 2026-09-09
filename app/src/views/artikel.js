@@ -304,14 +304,23 @@
       : null;
     behaelter.appendChild(karte(null, [kopf, daten, werkzeuge]));
 
-    // Beschaffung nur zeigen, wenn etwas drinsteht — eine Karte mit vier
-    // leeren Zeilen ist schlechter als gar keine.
-    if (a.kaufdatum || a.kaufpreis || a.lieferant) {
+    // Beschaffung. Für Gäste nur, wenn etwas drinsteht — eine Karte mit drei
+    // leeren Zeilen ist schlechter als gar keine. Angemeldete sehen sie immer,
+    // denn sie sollen die Angaben auch NACHTRAGEN können: bisher ließen sie
+    // sich nur beim Anlegen setzen.
+    const hatBeschaffung = a.kaufdatum || a.kaufpreis || a.lieferant;
+    if (hatBeschaffung || SL.store.istAngemeldet()) {
       const b = el('dl', { class: 'daten' });
       if (a.kaufdatum) datenZeile(b, 'Kaufdatum', SL.ui.formatDatum(String(a.kaufdatum).slice(0, 10)));
       if (a.kaufpreis) datenZeile(b, 'Preis', SL.ui.formatZahl(a.kaufpreis, 2) + ' €');
       if (a.lieferant) datenZeile(b, 'Lieferant', a.lieferant);
-      behaelter.appendChild(karte('Beschaffung', b));
+      const inhalt = [hatBeschaffung ? b : el('p', { class: 'muted' }, 'Noch nichts hinterlegt.')];
+      if (SL.store.istAngemeldet()) {
+        inhalt.push(el('div', { class: 'btn-reihe' }, [
+          el('button', { class: 'btn btn-sm', type: 'button', onclick: () => beschaffungDialog(a, neuLaden) }, 'Beschaffung bearbeiten'),
+        ]));
+      }
+      behaelter.appendChild(karte('Beschaffung', inhalt));
     }
 
     if (a.notizen) behaelter.appendChild(karte('Notizen', el('p', {}, a.notizen)));
@@ -497,6 +506,52 @@
     } catch (e) {
       toast(e.message || 'Die Buchung hat nicht geklappt.', 4500);
     }
+  }
+
+  // --- Beschaffung ---------------------------------------------------------
+  // Kaufdatum, Preis und Lieferant liegen als Homebox-Felder am Artikel
+  // (purchaseTime/purchasePrice/purchaseFrom) — dieselben Werte, die eine
+  // zugeordnete Rechnung dort hineinschreibt. Deshalb steht der Preis hier für
+  // „zuletzt bezahlt"; was eine EINZELNE Lieferung gekostet hat, bleibt an der
+  // Bestellung hängen und ändert sich nicht mehr.
+  function beschaffungDialog(a, neuLaden) {
+    const datum = input({ type: 'date', value: String(a.kaufdatum || '').slice(0, 10) });
+    const preis = input({ type: 'number', min: '0', step: '0.01', value: a.kaufpreis != null && a.kaufpreis !== 0 ? String(a.kaufpreis) : '' });
+    const lieferant = input({ value: a.lieferant || '', list: 'sl-lieferanten-artikel' });
+    const liste = el('datalist', { id: 'sl-lieferanten-artikel' });
+    // Vorschläge aus dem Bestand — scheitern sie, tippt man eben.
+    SL.api.lagerLieferanten().then(l => {
+      for (const x of l.slice(0, 40)) liste.appendChild(el('option', { value: x.name }));
+    }).catch(() => {});
+
+    const dlg = SL.ui.modal('Beschaffung', [
+      feldBlock('Kaufdatum', datum),
+      feldBlock('Preis (€)', preis),
+      feldBlock('Lieferant', el('span', {}, [lieferant, liste])),
+      el('p', { class: 'muted' }, 'Wird in Homebox gespeichert. Kommt der Artikel über eine Bestellung, '
+        + 'trägt die zugeordnete Rechnung diese Angaben von selbst nach.'),
+    ], {
+      fuss: [
+        el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            try {
+              await SL.api.lagerSpeichern(a.id, {
+                kaufdatum: datum.value || '',
+                // Leeres Feld = kein Preis. null, nicht 0 — sonst stünde da
+                // „0,00 €", was etwas ganz anderes behauptet.
+                kaufpreis: preis.value === '' ? null : Number(preis.value),
+                lieferant: lieferant.value.trim(),
+              });
+              dlg.close();
+              toast('Gespeichert.');
+              neuLaden();
+            } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.', 4500); }
+          },
+        }, 'Speichern'),
+      ],
+    });
   }
 
   // --- Bearbeiten ----------------------------------------------------------

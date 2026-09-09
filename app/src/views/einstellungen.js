@@ -15,6 +15,7 @@
 
     const kategorien = [
       { id: 'homebox', label: 'Homebox', render: renderHomebox },
+      { id: 'paperless', label: 'Paperless', render: renderPaperless },
       { id: 'allgemein', label: 'Allgemein', render: renderAllgemein },
       { id: 'benutzer', label: 'Benutzer', render: renderBenutzerHinweis },
     ];
@@ -155,6 +156,125 @@
         }, 'Übernehmen'),
       ]),
     ]));
+  }
+
+  // --- Paperless ------------------------------------------------------------
+  // Ablage für Lieferscheine und Rechnungen. Die Schule betreibt Paperless
+  // bereits; diese App legt dort nichts an und räumt dort nichts auf — sie
+  // schiebt Belege hinein und merkt sich die Nummer am Vorgang.
+  //
+  // Anders als im Unterrichtstool gilt der Zugang für die ganze Schule und
+  // nicht je Lehrkraft: das Lager hat EIN Paperless.
+  async function renderPaperless(mount) {
+    let cfg = null;
+    try {
+      cfg = await SL.api.paperlessConfig();
+    } catch (e) {
+      mount.appendChild(karte('Paperless', el('p', { class: 'anmeldung-fehler' }, e.message)));
+      return;
+    }
+
+    const url = input({ value: cfg.url || '', placeholder: 'https://paperless.schule.local' });
+    // Wie beim Homebox-Passwort: der Server gibt den Token nie heraus, leer
+    // lassen heißt behalten. Sonst müsste man ihn für jede Änderung an den
+    // Tags neu aus Paperless heraussuchen.
+    const token = input({ type: 'password', placeholder: cfg.hasToken ? '(gesetzt — leer lassen zum Behalten)' : 'API-Token aus dem Paperless-Profil' });
+
+    const status = el('p', { class: 'muted' });
+    const listenBox = el('div');
+
+    // Die Auswahllisten kommen aus Paperless selbst — die App erfindet keine
+    // Tags und keine Ablagepfade, sie benutzt die vorhandenen.
+    async function listenZeigen() {
+      listenBox.innerHTML = '';
+      if (!cfg.hasToken || !cfg.url) return;
+      let stamm = null;
+      try {
+        stamm = await SL.api.paperlessStammlisten();
+      } catch (e) {
+        listenBox.appendChild(karte('Zuordnung', el('p', { class: 'anmeldung-fehler' }, e.message)));
+        return;
+      }
+      const gewaehlt = { ...cfg };
+      const tagWahl = select(stamm.tags.map(t => ({ wert: t.id, label: t.name })), gewaehlt.uploadTagId,
+        v => { gewaehlt.uploadTagId = Number(v) || 0; }, { leerLabel: '— kein Tag —' });
+      const pfadWahl = select(stamm.ablagepfade.map(t => ({ wert: t.id, label: t.name })), gewaehlt.ablagepfadId,
+        v => { gewaehlt.ablagepfadId = Number(v) || 0; }, { leerLabel: '— Standard —' });
+      const typL = select(stamm.dokumenttypen.map(t => ({ wert: t.id, label: t.name })), gewaehlt.typLieferscheinId,
+        v => { gewaehlt.typLieferscheinId = Number(v) || 0; }, { leerLabel: '— kein Typ —' });
+      const typR = select(stamm.dokumenttypen.map(t => ({ wert: t.id, label: t.name })), gewaehlt.typRechnungId,
+        v => { gewaehlt.typRechnungId = Number(v) || 0; }, { leerLabel: '— kein Typ —' });
+
+      listenBox.appendChild(karte('Zuordnung', [
+        el('p', { class: 'muted' }, 'Jeder Beleg aus dieser App bekommt automatisch diesen Tag und diesen Ablagepfad. '
+          + 'So bleiben die Lagerbelege in Paperless auffindbar, ohne dass jemand nachsortieren muss.'),
+        feld('Tag für Uploads', tagWahl),
+        feld('Ablagepfad', pfadWahl),
+        feld('Dokumenttyp Lieferschein', typL),
+        feld('Dokumenttyp Rechnung', typR),
+        el('div', { class: 'btn-reihe' }, [
+          el('button', {
+            class: 'btn btn-primary', type: 'button',
+            onclick: async () => {
+              try {
+                cfg = await SL.api.putPaperlessConfig({
+                  uploadTagId: gewaehlt.uploadTagId,
+                  ablagepfadId: gewaehlt.ablagepfadId,
+                  typLieferscheinId: gewaehlt.typLieferscheinId,
+                  typRechnungId: gewaehlt.typRechnungId,
+                });
+                toast('Zuordnung gespeichert.');
+              } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }
+            },
+          }, 'Zuordnung speichern'),
+        ]),
+      ]));
+    }
+
+    async function zustandZeigen() {
+      status.textContent = 'Prüfe Verbindung…';
+      status.className = 'muted';
+      if (!cfg.eingerichtet) {
+        status.textContent = 'Noch nicht eingerichtet — ohne Paperless lassen sich keine Belege ablegen.';
+        listenBox.innerHTML = '';
+        return;
+      }
+      try {
+        const t = await SL.api.paperlessTest();
+        status.textContent = `Verbunden${t.dokumente != null ? ` · ${t.dokumente} Dokumente im Archiv` : ''}`;
+        status.className = 'hinweis-ok';
+        await listenZeigen();
+      } catch (e) {
+        status.textContent = e.message || 'Paperless antwortet nicht.';
+        status.className = 'anmeldung-fehler';
+        listenBox.innerHTML = '';
+      }
+    }
+
+    mount.appendChild(karte('Paperless-Zugang', [
+      el('p', { class: 'muted' }, 'Lieferscheine und Rechnungen liegen in Paperless, nicht in dieser App. '
+        + 'Den API-Token findest du in Paperless unter „Mein Profil". Er bleibt auf dem Server und wird nie an den Browser ausgeliefert.'),
+      feld('Adresse', url),
+      feld('API-Token', token),
+      el('div', { class: 'btn-reihe' }, [
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            try {
+              cfg = await SL.api.putPaperlessConfig({ url: url.value, token: token.value });
+              token.value = '';
+              toast('Zugang gespeichert.');
+              await zustandZeigen();
+            } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }
+          },
+        }, 'Speichern'),
+        el('button', { class: 'btn', type: 'button', onclick: zustandZeigen }, 'Verbindung prüfen'),
+      ]),
+      status,
+    ]));
+
+    mount.appendChild(listenBox);
+    await zustandZeigen();
   }
 
   // --- Allgemein ------------------------------------------------------------

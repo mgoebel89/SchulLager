@@ -893,3 +893,17 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
 .zaehl-feld::-webkit-outer-spin-button,
 .zaehl-feld::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .zaehl-feld { -moz-appearance: textfield; }
+
+/* ------------------------------------------------------------ Wareneingang */
+/* Steht bewusst AM ENDE der Datei: Media-Queries erhöhen die Spezifität
+   nicht, es entscheidet die Reihenfolge. Eine Regel weiter oben würde von
+   den Handy-Regeln darüber überstimmt. */
+.eingang-zeile { align-items: flex-start; }
+.eingang-zeile .doc-titel { min-width: 45%; }
+/* Minus, Menge, Plus und der Ort-Knopf gehören zusammen und dürfen nur ALS
+   BLOCK umbrechen — sonst steht das Plus unter dem Minus der Nachbarzeile. */
+.eingang-stepper {
+  display: flex; gap: 6px; align-items: center;
+  flex: 0 0 auto; margin-left: auto;
+}
+.eingang-stepper .zaehl-feld { width: 4.5rem; }

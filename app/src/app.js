@@ -18,6 +18,7 @@
       { path: '/orte', label: 'Lagerorte', icon: 'pin' },
       { path: '/scannen', label: 'Scannen', icon: 'scan' },
       { path: '/nachbestellung', label: 'Nachbestellen', icon: 'cart', angemeldet: true },
+      { path: '/bestellungen', label: 'Bestellungen', icon: 'beleg', angemeldet: true },
       { path: '/inventur', label: 'Inventur', icon: 'liste', angemeldet: true },
     ] },
     { label: 'Ausgabe', items: [
@@ -42,6 +43,7 @@
     tag: '<path d="M3 11V4a1 1 0 011-1h7l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     werkzeug: '<path d="M14.7 6.3a4 4 0 01-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 015.4-5.4l-2.5 2.5-1.4-1.4z"/>',
     liste: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
+    beleg: '<path d="M6 3h9l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
     cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 11.2a2 2 0 002 1.6h7.8a2 2 0 002-1.6L21 7H6"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
@@ -208,6 +210,7 @@
     if (path === '/scannen') return SL.views.renderScannen(mount);
     if (path === '/neu') return SL.views.renderNeuaufnahme(mount, params);
     if (path === '/nachbestellung') return SL.views.renderNachbestellung(mount);
+    if (path === '/bestellungen') return SL.views.renderBestellungen(mount, params);
     if (path === '/ausleihe') return SL.views.renderAusleihe(mount, params);
 
     // Kurzwege aus den QR-Etiketten. Sie sind bewusst knapp: jedes Zeichen

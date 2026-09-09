@@ -153,6 +153,59 @@
   const defektMelden = (d) => jsonFetch('/api/ausleihe/defekte', { method: 'POST', body: d });
   const defektBehoben = (id, notiz) => jsonFetch(`/api/ausleihe/defekte/${encodeURIComponent(id)}/behoben`, { method: 'POST', body: { notiz: notiz || '' } });
 
+  // --- Beschaffung: Bestellungen und Wareneingang ---
+  const listBestellungen = () => jsonFetch('/api/bestellungen');
+  const getBestellung = (id) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}`);
+  const bestellungAnlegen = (b) => jsonFetch('/api/bestellungen', { method: 'POST', body: b });
+  const bestellungSpeichern = (id, b) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}`, { method: 'PUT', body: b });
+  const bestellungZustand = (id, zustand) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/zustand`, { method: 'POST', body: { zustand } });
+  const bestellungLoeschen = (id) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const wareneingang = (id, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/eingang`, { method: 'POST', body: d });
+  const positionEingelagert = (id, positionId, eingelagert) =>
+    jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/position/${encodeURIComponent(positionId)}/eingelagert`, { method: 'POST', body: { eingelagert } });
+  const belegVerknuepfen = (id, b) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg`, { method: 'POST', body: b });
+  const belegLoesen = (id, belegId) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg/${encodeURIComponent(belegId)}`, { method: 'DELETE' });
+  const rechnungZuordnen = (id, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/rechnung`, { method: 'POST', body: d });
+  const lagerLieferanten = () => jsonFetch('/api/bestellungen/lieferanten');
+
+  // --- Paperless (Belegablage) ---
+  const paperlessConfig = () => jsonFetch('/api/dokumente/config');
+  const putPaperlessConfig = (c) => jsonFetch('/api/dokumente/config', { method: 'PUT', body: c });
+  const paperlessStammlisten = () => jsonFetch('/api/dokumente/stammlisten');
+  const paperlessTest = () => jsonFetch('/api/dokumente/test');
+  const paperlessHealth = () => jsonFetch('/api/dokumente/health');
+  const paperlessDokument = (id) => jsonFetch(`/api/dokumente/${encodeURIComponent(id)}`);
+  const paperlessTask = (taskId) => jsonFetch(`/api/dokumente/task/${encodeURIComponent(taskId)}`);
+  // Adresse der Vorschau/Datei — direkt als src oder href verwendbar. Der
+  // Server holt sie mit dem Token, der Browser braucht keinen.
+  const paperlessDateiUrl = (id, art = 'preview') => `/api/dokumente/${encodeURIComponent(id)}/datei?art=${encodeURIComponent(art)}`;
+
+  // Beleg nach Paperless. Wie beim Foto ohne jsonFetch — bei multipart muss
+  // der Browser den Content-Type samt Grenzmarke selbst setzen.
+  //
+  // Antwortet mit der Task-Kennung, NICHT mit der Dokumentnummer: Paperless
+  // verarbeitet den Upload asynchron. Die Nummer trägt der Server nach.
+  async function belegHochladen(datei, { titel = '', erstellt = '', typId = 0 } = {}) {
+    const fd = new FormData();
+    fd.append('datei', datei, datei.name || 'beleg.pdf');
+    if (titel) fd.append('titel', titel);
+    if (erstellt) fd.append('erstellt', erstellt);
+    if (typId) fd.append('typId', String(typId));
+    const res = await fetch('/api/dokumente', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Client-Id': CLIENT_ID },
+      body: fd,
+    });
+    if (!res.ok) {
+      let daten = null;
+      const txt = await res.text().catch(() => '');
+      try { daten = JSON.parse(txt); } catch (_) {}
+      throw new ApiFehler((daten && daten.error) || `Fehler ${res.status}`, res.status);
+    }
+    return res.json();
+  }
+
   // Datei-Upload läuft NICHT über jsonFetch: bei multipart muss der Browser den
   // Content-Type samt Grenzmarke selbst setzen. Wer ihn von Hand setzt, macht
   // die Teile für den Server unlesbar.
@@ -223,6 +276,11 @@
     komponentenSpalten, komponentenVorlage, komponentenImport,
     listInventuren, getInventur, inventurStarten, inventurZaehlen,
     inventurAbschliessen, inventurUebernehmen, inventurLoeschen,
+    listBestellungen, getBestellung, bestellungAnlegen, bestellungSpeichern,
+    bestellungZustand, bestellungLoeschen, wareneingang, positionEingelagert,
+    belegVerknuepfen, belegLoesen, rechnungZuordnen, lagerLieferanten,
+    paperlessConfig, putPaperlessConfig, paperlessStammlisten, paperlessTest,
+    paperlessHealth, paperlessDokument, paperlessTask, paperlessDateiUrl, belegHochladen,
     listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
     listDefekte, defektMelden, defektBehoben,
     subscribe, connectWs,

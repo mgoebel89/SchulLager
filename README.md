@@ -219,6 +219,65 @@ kennt keinen Begriff dafür. Wer was hat, ist eine Personenangabe und deshalb
 auch zum Lesen nur angemeldet einsehbar. Die Klassenliste wird unter
 Einstellungen → Allgemein gepflegt.
 
+### Beschaffung: bestellen, prüfen, einlagern
+
+Der Weg einer Lieferung durch die App:
+
+1. **Bestellen.** Unter *Bestellungen → + Neue Bestellung* Lieferant, Datum und
+   Bestellnummer eintragen. Positionen kommen aus dem Bestand, aus der
+   Nachbestell-Liste (Menge bis zum Mindestbestand vorbelegt) oder als **freie
+   Position** — etwas, das es im Lager noch nicht gibt. Für die Verwaltung
+   fällt eine *Bestellanforderung als PDF* ab.
+
+2. **Wareneingang.** Lieferschein daneben, Bestellung öffnen, *Wareneingang*.
+   Die bestellten Positionen sind die führende Liste; ein Scan zählt die
+   passende Zeile hoch. Gescannt wird **auf zwei Wegen**: mit der Kamera wie im
+   übrigen Lager, oder über das Eingabefeld, in das ein USB-Handscanner wie
+   eine Tastatur hineintippt (Abschluss mit Enter). Mengen lassen sich auch
+   direkt eintragen — bei hundert Widerständen scannt niemand hundertmal.
+
+   * **Unbekannter Code** → die App fragt, zu welcher Position er gehört, und
+     merkt ihn am Artikel. Beim nächsten Mal wird er sofort erkannt; das Lager
+     lernt sich beim Arbeiten selbst ein.
+   * **Freie Position** → *Artikel …* ordnet einen vorhandenen Artikel zu oder
+     legt den neuen gleich hier an (mit Bestand 0; die gelieferte Menge bucht
+     unmittelbar danach der Wareneingang).
+   * **Kein Lagerort hinterlegt** → wird sofort gefragt, sobald die Zeile das
+     erste Mal hochgeht — egal ob durch Scan oder durch Tippen.
+   * Teillieferung und Überlieferung werden eingetragen, nicht verboten.
+
+   Gebucht wird **relativ**, wie überall in dieser App.
+
+3. **Einlagern.** Direkt nach dem Buchen öffnet sich die Liste, **nach Raum →
+   Schrank → Fach gruppiert**: einmal den Weg abgehen und abhaken. Positionen
+   ohne Lagerort stehen am Ende und lassen sich von dort aus zuweisen.
+
+4. **Belege.** Lieferschein abfotografieren oder Rechnungs-PDF wählen — beides
+   geht nach **Paperless** und wird am Vorgang vermerkt. Paperless verarbeitet
+   den Upload asynchron (OCR); bis die Dokumentnummer feststeht, steht am Beleg
+   „wird verarbeitet…". Die App trägt sie beim nächsten Öffnen nach.
+
+5. **Rechnung.** Wochen später: Rechnungsnummer, Datum und Einzelpreise
+   nachtragen. Auf Wunsch wandern Kaufpreis, Kaufdatum und Lieferant an die
+   Artikel in Homebox. **Der Preis der Position bleibt, wo er ist** — eine
+   Abrechnung vom Mai darf sich nicht ändern, weil im Oktober teurer
+   nachgekauft wurde.
+
+Rücksendungen und Reklamationen sind bewusst kein eigener Zustand, sondern eine
+Bemerkung am Vorgang: ein seltener Fall braucht keinen Apparat.
+
+### Paperless einrichten
+
+*Einstellungen → Paperless.* Adresse der Instanz und ein API-Token (in Paperless
+unter „Mein Profil"). Anders als im Unterrichtstool gilt der Zugang für die
+**ganze Schule** und nicht je Lehrkraft — das Lager hat ein Paperless.
+
+Danach lassen sich **Upload-Tag**, **Ablagepfad** und die Dokumenttypen für
+Lieferschein und Rechnung aus den in Paperless vorhandenen Listen wählen. Jeder
+Beleg aus dieser App bekommt Tag und Pfad automatisch, damit die Lagerbelege
+dort auffindbar bleiben. Die App legt in Paperless nichts an und löscht dort
+nichts: Löst man eine Verknüpfung, bleibt das Dokument erhalten.
+
 ### Was sich scannen lässt
 
 | Sorte | Beispiel | Wirkung |
@@ -256,7 +315,10 @@ wandern können.
 - [x] **Phase 5 — Inventur:** Zähl-Läufe Regal für Regal, Sollwert-Schnappschuss,
       Abweichungsliste, Übernahme der gezählten Bestände und Protokoll-PDF.
 - [x] **CSV-Import** für Komponenten samt Beispieldatei.
-- [ ] Phase 6 — Beschaffung und Dokumente
+- [x] **Phase 6 — Beschaffung und Dokumente:** Bestellungen mit Positionen und
+      Bestellanforderung als PDF, Wareneingang gegen den Lieferschein (Kamera
+      ODER Handscanner, unbekannte Codes werden angelernt), Einlagern-Liste
+      nach Lagerort, Rechnung mit Preisnachtrag, Belegablage in Paperless.
 - [ ] Phase 3 — Etiketten (ans Ende geschoben; braucht die genauen
       Brother-Modelle)
 
