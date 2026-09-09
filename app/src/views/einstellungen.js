@@ -288,6 +288,11 @@
 
     const marke = input({ value: s.demonstratorMarke || 'Demonstrator' });
     const netzMarke = input({ value: s.netzgeraetMarke || 'Netzgerät' });
+    // Vergabegrenze der Schule. Steht hier und nicht im Code: eine
+    // Verwaltungsvorgabe ändert sich, ohne dass jemand die App neu ausrollt.
+    const schwelle = input({ type: 'number', min: '0', step: '100', value: String(s.angebotSchwelle) });
+    const anzahl = input({ type: 'number', min: '1', step: '1', value: String(s.angebotAnzahl) });
+    const mwst = input({ type: 'number', min: '0', step: '0.1', value: String(s.mwstSatz) });
 
     mount.appendChild(karte('Allgemein', [
       feld('Schule', schule),
@@ -300,6 +305,18 @@
         + 'beiden Tags lassen sich ausleihen und können Netzangaben tragen; alles andere gilt '
         + 'als Verbrauchsmaterial und wird ausgegeben. Die Tags entstehen beim Anlegen von '
         + 'selbst und lassen sich in Homebox auch vorhandenen Artikeln zuweisen.'),
+      el('h3', { class: 'abschnitt' }, 'Beschaffung'),
+      el('div', { class: 'form-grid' }, [
+        feld('Angebote nötig ab (€ brutto)', schwelle),
+        feld('Anzahl Angebote', anzahl),
+        feld('Mehrwertsteuer (%)', mwst),
+      ]),
+      el('p', { class: 'muted' },
+        'Ab diesem BRUTTO-Bestellwert verlangt die Schule Vergleichsangebote. Die App warnt dann '
+        + 'am Vorgang und auf der Bestellanforderung — sie blockiert nicht, denn es gibt begründete '
+        + 'Ausnahmen (Alleinanbieter, Ersatzteil zum vorhandenen Gerät). Der Steuersatz wird '
+        + 'gebraucht, weil Bestellungen netto ODER brutto erfasst werden können, die Grenze aber '
+        + 'immer brutto gilt.'),
       el('div', { class: 'btn-reihe' }, [
         el('button', {
           class: 'btn btn-primary', type: 'button',
@@ -318,6 +335,9 @@
                 klassen: klassen.value.split('\n').map(z => z.trim()).filter(Boolean),
                 demonstratorMarke: marke.value.trim(),
                 netzgeraetMarke: netzMarke.value.trim(),
+                angebotSchwelle: Number(schwelle.value) || 0,
+                angebotAnzahl: Number(anzahl.value) || 0,
+                mwstSatz: Number(mwst.value) || 0,
               });
               toast('Gespeichert.');
             } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }

@@ -907,3 +907,6 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
   flex: 0 0 auto; margin-left: auto;
 }
 .eingang-stepper .zaehl-feld { width: 4.5rem; }
+
+/* Angebotszeile: Name und Fähnchen brauchen Luft dazwischen. */
+.angebot-kopf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

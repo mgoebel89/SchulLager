@@ -18,6 +18,7 @@
   // (Abschluss mit Enter). Deshalb hat das Feld immer den Fokus.
 
   const ZUSTAND = {
+    anfrage: { label: 'Anfrage — Angebote', klasse: 'ampel-offen' },
     offen: { label: 'offen', klasse: 'ampel-offen' },
     teilweise: { label: 'teilweise geliefert', klasse: 'ampel-bald' },
     vollstaendig: { label: 'vollständig geliefert', klasse: 'ampel-ok' },
@@ -26,6 +27,31 @@
   };
 
   const euro = (n) => (n === null || n === undefined || n === '' ? '' : SL.ui.formatZahl(n, 2) + ' €');
+
+  // Eine Summe wird in dieser Ansicht NIE ohne „netto"/„brutto" gezeigt: ob die
+  // erfassten Preise das eine oder das andere sind, entscheidet jeder Vorgang
+  // für sich — und an genau dieser Unterscheidung hängt die Angebotspflicht.
+  function summeText(b) {
+    // In der Listenantwort fehlen die Positionen (sie wären Ballast) — dort
+    // trägt `summe` bereits die Rohsumme. `summen()` rechnet aus den
+    // Positionen; fehlen sie, wird die Rohsumme untergeschoben.
+    const quelle = (b.positionen && b.positionen.length)
+      ? b
+      : { preisArt: b.preisArt, positionen: [{ menge: 1, preis: b.summe || 0 }] };
+    const s = SL.models.summen(quelle, SL.store.state.settings);
+    if (!s.erfasst) return '';
+    return s.art === 'brutto'
+      ? `${euro(s.brutto)} brutto (${euro(s.netto)} netto)`
+      : `${euro(s.netto)} netto (${euro(s.brutto)} brutto)`;
+  }
+
+  // Angebotsbeträge zum Vergleich auf brutto bringen — ein Angebot kann netto
+  // ausgewiesen sein, während der Vorgang brutto rechnet.
+  function angebotBrutto(a) {
+    if (a.betrag == null) return null;
+    const satz = Number(SL.store.state.settings.mwstSatz) || 0;
+    return a.preisArt === 'brutto' ? a.betrag : a.betrag * (1 + satz / 100);
+  }
   const zustandFlagge = (z) => el('span', { class: 'ampel ' + (ZUSTAND[z] || ZUSTAND.offen).klasse }, (ZUSTAND[z] || ZUSTAND.offen).label);
 
   // --- Einstieg -------------------------------------------------------------
@@ -98,12 +124,19 @@
           zustandFlagge(b.zustand),
         ]),
         el('p', { class: 'muted' }, [
-          formatDatum(String(b.bestelltAm || '').slice(0, 10)),
+          b.bestelltAm ? formatDatum(String(b.bestelltAm).slice(0, 10)) : 'noch nicht beauftragt',
           b.belegnummer ? ` · ${b.belegnummer}` : '',
           ` · ${b.anzahlPositionen} ${b.anzahlPositionen === 1 ? 'Position' : 'Positionen'}`,
-          b.summe ? ` · ${euro(b.summe)}` : '',
+          b.summe ? ` · ${summeText(b)}` : '',
         ].join('')),
       ];
+      // Die Angebotspflicht gehört schon in die Liste: wer sie erst im Detail
+      // sieht, merkt beim Durchsehen offener Vorgänge nicht, wo etwas fehlt.
+      const pflicht = SL.models.angebotspflicht(b, SL.store.state.settings);
+      if (pflicht.pflichtig && !pflicht.erfuellt) {
+        zeilen.push(el('p', { class: 'ampel ampel-warnung' },
+          `${pflicht.fehlend} von ${pflicht.noetig} Angeboten fehlen`));
+      }
       if (b.einzulagern) {
         zeilen.push(el('p', { class: 'ampel ampel-bald' }, `${b.einzulagern} noch einzulagern`));
       }
@@ -139,20 +172,30 @@
       zustandFlagge(b.zustand),
     ]));
 
+    const anfrage = SL.models.istAnfrage(b);
+    const pflicht = SL.models.angebotspflicht(b, SL.store.state.settings);
+
     // --- Kopf
     const kopf = el('dl', { class: 'daten' }, [
-      zeile('Bestellt am', formatDatum(String(b.bestelltAm || '').slice(0, 10))),
+      zeile(anfrage ? 'Angefragt am' : 'Bestellt am',
+        anfrage
+          ? formatDatum(String(b.angefragtAm || b.angelegtAm || '').slice(0, 10))
+          : formatDatum(String(b.bestelltAm || '').slice(0, 10))),
       b.belegnummer ? zeile('Bestellnummer', b.belegnummer) : null,
       zeile('Positionen', String((b.positionen || []).length)),
-      zeile('Summe (bestellt)', euro(b.summe)),
+      zeile('Summe (bestellt)', summeText(b)),
+      b.vergabeBegruendung ? zeile('Begründung der Vergabe', b.vergabeBegruendung) : null,
       b.rechnung ? zeile('Rechnung', `${b.rechnung.nummer || '(ohne Nummer)'} vom ${formatDatum(b.rechnung.datum)}${b.rechnung.betrag != null ? ' · ' + euro(b.rechnung.betrag) : ''}`) : null,
       b.notiz ? zeile('Bemerkung', b.notiz) : null,
     ]);
 
     const aktionen = el('div', { class: 'btn-reihe' }, [
+      // Solange nichts beauftragt ist, kann auch nichts ankommen. Der Knopf
+      // bleibt sichtbar, aber gesperrt — sonst sucht man ihn.
       el('button', {
         class: 'btn btn-primary', type: 'button',
-        disabled: b.zustand === 'storniert',
+        disabled: b.zustand === 'storniert' || anfrage,
+        title: anfrage ? 'Erst ein Angebot beauftragen — vorher kann nichts geliefert werden.' : '',
         onclick: () => wareneingangOeffnen(b, auffrischen),
       }, '📦 Wareneingang'),
       b.einzulagern ? el('button', {
@@ -167,6 +210,9 @@
     ]);
 
     box.appendChild(karte('Bestellung', [kopf, aktionen]));
+
+    // --- Angebote (bei Pflicht oder wenn welche da sind)
+    box.appendChild(angebotKarte(b, pflicht, anfrage, auffrischen));
 
     // --- Positionen
     box.appendChild(karte('Positionen', [positionenTabelle(b)]));
@@ -249,6 +295,212 @@
     t.appendChild(tb);
     wrap.appendChild(t);
     return wrap;
+  }
+
+  // --- Angebote -------------------------------------------------------------
+  // Ab dem Schwellenwert der Schule (3000 € brutto, einstellbar) müssen mehrere
+  // Angebote vorliegen. Sie werden VOR der Bestellung eingeholt: der Vorgang
+  // beginnt als Anfrage, sammelt Angebote, und das Beauftragen eines Angebots
+  // macht daraus die Bestellung — samt Lieferant.
+  //
+  // GEWARNT, NICHT BLOCKIERT: es gibt begründete Ausnahmen (Alleinanbieter,
+  // Folgebeschaffung, Ersatzteil zum vorhandenen Gerät), die die App nicht
+  // kennen kann. Sie sagt, was fehlt; entscheiden muss ein Mensch.
+  function angebotKarte(b, pflicht, anfrage, fertig) {
+    const angebote = b.angebote || [];
+    const inhalt = [];
+
+    if (pflicht.pflichtig) {
+      const fehlt = !pflicht.erfuellt;
+      inhalt.push(el('p', { class: 'ampel ' + (fehlt ? 'ampel-warnung' : 'ampel-ok') },
+        fehlt
+          ? `Ab ${euro(pflicht.schwelle)} brutto sind ${pflicht.noetig} Angebote einzureichen — es fehlen noch ${pflicht.fehlend}.`
+          : `${pflicht.noetig} Angebote liegen vor — die Vorgabe ab ${euro(pflicht.schwelle)} brutto ist erfüllt.`));
+    } else if (angebote.length) {
+      inhalt.push(el('p', { class: 'muted' },
+        `Unter ${euro(pflicht.schwelle)} brutto verlangt die Schule keine Vergleichsangebote — festgehalten sind sie trotzdem.`));
+    } else {
+      inhalt.push(el('p', { class: 'muted' },
+        `Dieser Vorgang liegt unter ${euro(pflicht.schwelle)} brutto; Vergleichsangebote sind nicht nötig. Anhängen lassen sie sich trotzdem.`));
+    }
+
+    // Das günstigste Angebot ist der Bezugspunkt für die Begründungspflicht:
+    // wer teurer vergibt, muss sagen warum.
+    const brutti = angebote.map(a => angebotBrutto(a)).filter(x => x != null);
+    const guenstigstes = brutti.length ? Math.min(...brutti) : null;
+
+    for (const a of angebote) {
+      const br = angebotBrutto(a);
+      const istGuenstigstes = br != null && guenstigstes != null && br <= guenstigstes + 0.005;
+      inhalt.push(el('div', { class: 'doc-zeile' }, [
+        el('span', { class: 'doc-titel' }, [
+          // Eigene Zeile mit Abstand: ohne sie klebt das Fähnchen direkt am
+          // Lieferantennamen („Bürklingünstigstes").
+          el('div', { class: 'angebot-kopf' }, [
+            el('strong', {}, a.lieferant || '(ohne Lieferant)'),
+            a.gewaehlt ? el('span', { class: 'ampel ampel-ok' }, 'beauftragt') : null,
+            (istGuenstigstes && angebote.length > 1) ? el('span', { class: 'tag' }, 'günstigstes') : null,
+          ]),
+          el('div', { class: 'muted' }, [
+            a.betrag != null ? `${euro(a.betrag)} ${a.preisArt}` : 'ohne Betrag',
+            (a.betrag != null && a.preisArt === 'netto') ? ` (${euro(br)} brutto)` : '',
+            a.nummer ? ` · Nr. ${a.nummer}` : '',
+            a.datum ? ` · ${formatDatum(a.datum)}` : '',
+          ].join('')),
+          a.notiz ? el('div', { class: 'muted' }, a.notiz) : null,
+        ]),
+        a.dokumentId
+          ? el('a', { class: 'btn btn-sm', href: SL.api.paperlessDateiUrl(a.dokumentId, 'preview'), target: '_blank', rel: 'noopener' }, 'Ansehen')
+          : (a.taskId
+            ? el('span', { class: 'ampel ' + (a.fehler ? 'ampel-warnung' : 'ampel-offen') },
+              a.fehler ? 'Paperless meldet einen Fehler' : 'wird verarbeitet…')
+            : el('button', { class: 'btn btn-sm', type: 'button', onclick: () => angebotPdf(b, a, fertig) }, '+ PDF')),
+        (!a.gewaehlt && anfrage)
+          ? el('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => beauftragen(b, a, angebote, fertig) }, 'Beauftragen')
+          : null,
+        el('button', { class: 'btn btn-sm', type: 'button', onclick: () => angebotDialog(b, a, fertig) }, 'Ändern'),
+        el('button', {
+          class: 'btn btn-sm link-danger', type: 'button',
+          onclick: async () => {
+            if (!SL.ui.confirmDialog(`Angebot von „${a.lieferant}" entfernen? Ein zugehöriges PDF bleibt in Paperless.`)) return;
+            try { await SL.api.angebotLoeschen(b.id, a.id); toast('Angebot entfernt.'); fertig(); }
+            catch (e) { toast(e.message || 'Entfernen fehlgeschlagen.', 4500); }
+          },
+        }, '✕'),
+      ]));
+    }
+
+    inhalt.push(el('div', { class: 'btn-reihe' }, [
+      el('button', { class: 'btn', type: 'button', onclick: () => angebotDialog(b, null, fertig) }, '+ Angebot'),
+      (!anfrage && !(b.eingaenge || []).length) ? el('button', {
+        class: 'btn', type: 'button',
+        title: 'Beauftragung zurücknehmen und wieder Angebote vergleichen',
+        onclick: async () => {
+          if (!SL.ui.confirmDialog('Beauftragung zurücknehmen? Der Vorgang wird wieder zur Anfrage.')) return;
+          try { await SL.api.zurueckZurAnfrage(b.id); toast('Wieder eine Anfrage.'); fertig(); }
+          catch (e) { toast(e.message || 'Fehlgeschlagen.', 4500); }
+        },
+      }, 'Zurück zur Anfrage') : null,
+    ]));
+
+    return karte('Angebote', inhalt);
+  }
+
+  function angebotDialog(b, a, fertig) {
+    const istNeu = !a;
+    const lieferant = input({ value: a ? a.lieferant : '', list: 'sl-lieferanten-angebot' });
+    const liste = el('datalist', { id: 'sl-lieferanten-angebot' });
+    SL.api.lagerLieferanten().then(l => {
+      for (const x of l.slice(0, 40)) liste.appendChild(el('option', { value: x.name }));
+    }).catch(() => {});
+    const betrag = input({ type: 'number', step: '0.01', min: '0', value: a && a.betrag != null ? String(a.betrag) : '' });
+    const art = SL.ui.select(
+      [{ wert: 'netto', label: 'netto' }, { wert: 'brutto', label: 'brutto' }],
+      a ? a.preisArt : 'netto', () => {}, { leerLabel: false });
+    const nummer = input({ value: a ? a.nummer : '', placeholder: 'Angebotsnummer' });
+    const datum = input({ type: 'date', value: a ? a.datum : SL.models.heuteIso() });
+    const notiz = input({ value: a ? a.notiz : '', placeholder: 'Lieferzeit, Besonderheiten …' });
+
+    const dlg = modal(istNeu ? 'Angebot erfassen' : 'Angebot ändern', [
+      el('div', { class: 'form-grid' }, [
+        feld('Lieferant', el('span', {}, [lieferant, liste])),
+        feld('Angebotssumme', betrag),
+        feld('Summe ist', art),
+        feld('Angebotsnummer', nummer),
+        feld('Datum', datum),
+      ]),
+      feld('Bemerkung', notiz, { breit: true }),
+      el('p', { class: 'muted' }, 'Netto oder brutto trägt jedes Angebot für sich — der eine Lieferant weist es so aus, '
+        + 'der andere anders. Für den Vergleich rechnet die App alles auf brutto.'),
+      istNeu ? el('p', { class: 'muted' }, 'Das Angebots-PDF hängst du gleich danach an; es geht nach Paperless.') : null,
+    ], {
+      fuss: [
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            if (!lieferant.value.trim()) { toast('Bitte den Lieferanten angeben.'); return; }
+            const koerper = {
+              lieferant: lieferant.value.trim(),
+              betrag: betrag.value === '' ? null : Number(betrag.value),
+              preisArt: art.value,
+              nummer: nummer.value.trim(),
+              datum: datum.value,
+              notiz: notiz.value.trim(),
+            };
+            try {
+              if (istNeu) await SL.api.angebotAnlegen(b.id, koerper);
+              else await SL.api.angebotSpeichern(b.id, a.id, koerper);
+              dlg.close();
+              toast(istNeu ? 'Angebot erfasst.' : 'Angebot geändert.');
+              fertig();
+            } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.', 4500); }
+          },
+        }, 'Speichern'),
+      ],
+    });
+    setTimeout(() => lieferant.focus(), 50);
+  }
+
+  async function angebotPdf(b, a, fertig) {
+    const datei = await SL.ui.pickFile('application/pdf,image/*');
+    if (!datei) return;
+    const titel = `Angebot ${a.lieferant}${a.nummer ? ' ' + a.nummer : ''}`.trim();
+    toast('Angebot wird hochgeladen…', 8000);
+    try {
+      const klein = await SL.ui.resizeImageFile(datei, { maxPx: 2000, quality: 0.85 });
+      const { taskId } = await SL.api.belegHochladen(klein, { titel, erstellt: a.datum || SL.models.heuteIso() });
+      await SL.api.angebotSpeichern(b.id, a.id, { taskId });
+      toast('Angebot in Paperless abgelegt — die Nummer trägt sich nach der Verarbeitung nach.', 4000);
+      fertig();
+    } catch (e) {
+      toast(e.message || 'Hochladen fehlgeschlagen.', 5000);
+    }
+  }
+
+  // Beauftragen ist die Vergabeentscheidung. Wird NICHT das günstigste Angebot
+  // gewählt, verlangt die App eine Begründung — genau danach fragt die
+  // Verwaltung, und im Nachhinein weiß es niemand mehr.
+  function beauftragen(b, a, alle, fertig) {
+    const brutti = alle.map(x => angebotBrutto(x)).filter(x => x != null);
+    const guenstigstes = brutti.length ? Math.min(...brutti) : null;
+    const dieses = angebotBrutto(a);
+    const teurer = dieses != null && guenstigstes != null && dieses > guenstigstes + 0.005;
+
+    const datum = input({ type: 'date', value: SL.models.heuteIso() });
+    const begruendung = textarea({
+      rows: 3,
+      placeholder: teurer ? 'Warum dieses Angebot und nicht das günstigste?' : 'Bemerkung zur Vergabe (freiwillig)',
+    });
+    if (b.vergabeBegruendung) begruendung.value = b.vergabeBegruendung;
+
+    const dlg = modal(`Beauftragen: ${a.lieferant}`, [
+      el('p', {}, 'Damit wird aus der Anfrage eine Bestellung. Lieferant und Bestelldatum kommen aus diesem Angebot.'),
+      teurer
+        ? el('p', { class: 'ampel ampel-warnung' },
+          `Dieses Angebot ist um ${euro(dieses - guenstigstes)} brutto teurer als das günstigste. Bitte kurz begründen.`)
+        : null,
+      feld('Bestelldatum', datum),
+      feld('Begründung', begruendung, { breit: true }),
+    ], {
+      fuss: [
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            if (teurer && !begruendung.value.trim()) { toast('Bitte die Vergabe begründen.'); return; }
+            try {
+              await SL.api.angebotBeauftragen(b.id, a.id, { bestelltAm: datum.value, begruendung: begruendung.value.trim() });
+              dlg.close();
+              toast(`Beauftragt: ${a.lieferant}`);
+              fertig();
+            } catch (e) { toast(e.message || 'Beauftragen fehlgeschlagen.', 4500); }
+          },
+        }, 'Beauftragen'),
+      ],
+    });
   }
 
   // --- Belege (Paperless) ---------------------------------------------------
@@ -337,7 +589,14 @@
       positionen: b ? (b.positionen || []).map(p => ({ ...p })) : [],
     };
 
+    const anfrage = b ? SL.models.istAnfrage(b) : false;
     const lieferantFeld = input({ value: daten.lieferant, list: 'sl-lieferanten', placeholder: 'z. B. Conrad, Reichelt' });
+    // Netto oder brutto entscheidet der Vorgang. Die Auswahl steht direkt neben
+    // den Preisen und nicht in den Einstellungen: sie gehört zum Angebot, das
+    // gerade auf dem Tisch liegt.
+    const artFeld = SL.ui.select(
+      [{ wert: 'netto', label: 'netto' }, { wert: 'brutto', label: 'brutto' }],
+      (b && b.preisArt) || 'netto', () => summeZeigen(), { leerLabel: false });
     const datenListe = el('datalist', { id: 'sl-lieferanten' });
     const datumFeld = input({ type: 'date', value: daten.bestelltAm });
     const nummerFeld = input({ value: daten.belegnummer, placeholder: 'Bestell- oder Vorgangsnummer' });
@@ -345,6 +604,7 @@
 
     const posBox = el('div');
     const summe = el('p', { class: 'muted' });
+    let alsAnfrage = false;
 
     function posZeichnen() {
       posBox.innerHTML = '';
@@ -380,8 +640,13 @@
       summeZeigen();
     }
     function summeZeigen() {
-      const s = daten.positionen.reduce((acc, p) => acc + (p.preis != null ? p.preis * p.menge : 0), 0);
-      summe.textContent = s ? `Summe: ${euro(s)}` : '';
+      const entwurf = { preisArt: artFeld.value, positionen: daten.positionen };
+      const w = SL.models.summen(entwurf, SL.store.state.settings);
+      if (!w.erfasst) { summe.textContent = ''; summe.className = 'muted'; return; }
+      const pflicht = SL.models.angebotspflicht(entwurf, SL.store.state.settings);
+      summe.textContent = `Summe: ${euro(w.netto)} netto · ${euro(w.brutto)} brutto`
+        + (pflicht.pflichtig ? ` — ab ${euro(pflicht.schwelle)} brutto sind ${pflicht.noetig} Angebote nötig.` : '');
+      summe.className = pflicht.pflichtig ? 'ampel ampel-bald' : 'muted';
     }
 
     const dlg = modal(istNeu ? 'Neue Bestellung' : 'Bestellung bearbeiten', [
@@ -389,6 +654,7 @@
         feld('Lieferant', el('span', {}, [lieferantFeld, datenListe])),
         feld('Bestelldatum', datumFeld),
         feld('Bestellnummer', nummerFeld),
+        feld('Preise sind', artFeld),
       ]),
       feld('Bemerkung', notizFeld, { breit: true }),
       el('h3', { class: 'abschnitt' }, 'Positionen'),
@@ -405,7 +671,17 @@
       fuss: [
         el('span', { class: 'spacer' }),
         el('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'),
-        el('button', { class: 'btn btn-primary', type: 'button', onclick: speichern }, 'Speichern'),
+        // Beim Anlegen die Wahl: gleich bestellen (Lieferant steht fest) oder
+        // erst Angebote einholen. Ab der Schwelle ist Letzteres der Regelfall.
+        istNeu ? el('button', {
+          class: 'btn', type: 'button',
+          title: 'Ohne Lieferant anlegen und zuerst Angebote einholen',
+          onclick: () => { alsAnfrage = true; speichern(); },
+        }, 'Als Anfrage anlegen') : null,
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: () => { alsAnfrage = false; speichern(); },
+        }, 'Speichern'),
       ],
     });
 
@@ -517,9 +793,16 @@
         bestelltAm: datumFeld.value,
         belegnummer: nummerFeld.value.trim(),
         notiz: notizFeld.value.trim(),
+        preisArt: artFeld.value,
         positionen: daten.positionen,
       };
-      if (!koerper.lieferant) { toast('Bitte den Lieferanten eintragen.'); return; }
+      // Eine ANFRAGE hat noch keinen Lieferanten — der kommt aus dem Angebot,
+      // das man beauftragt. Nur eine echte Bestellung braucht ihn.
+      if (!koerper.lieferant && !(istNeu ? alsAnfrage : anfrage)) {
+        toast('Bitte den Lieferanten eintragen — oder den Vorgang als Anfrage anlegen.', 4500);
+        return;
+      }
+      if (istNeu && alsAnfrage) { koerper.alsAnfrage = true; koerper.bestelltAm = ''; }
       try {
         if (istNeu) {
           const angelegt = await SL.api.bestellungAnlegen(koerper);

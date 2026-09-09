@@ -15,6 +15,16 @@
 // PREISE WERDEN MITGESCHRIEBEN. Der Preis der Position gehört zu DIESER
 // Lieferung. Wird im Oktober teurer nachgekauft, darf sich die Abrechnung vom
 // Mai nicht rückwirkend ändern.
+//
+// ANFRAGE VOR BESTELLUNG. Ab einem Bruttowert, den die Schule vorgibt (3000 €),
+// müssen mehrere Angebote eingeholt werden — und die holt man VOR der
+// Bestellung ein. Ein Vorgang ohne `bestelltAm` ist deshalb eine Anfrage: die
+// Positionen stehen, der Lieferant nicht. Erst das BEAUFTRAGEN eines Angebots
+// macht daraus eine Bestellung und setzt den Lieferanten.
+//
+// NETTO ODER BRUTTO entscheidet der einzelne Vorgang (`preisArt`) — der eine
+// Lieferant bietet so an, der andere anders. Die Schwelle ist brutto; welcher
+// Wert erfasst wurde, muss deshalb an JEDER angezeigten Summe stehen.
 
 const express = require('express');
 const crypto = require('crypto');
@@ -55,6 +65,27 @@ function normPosition(p, alt = null) {
   };
 }
 
+function normAngebot(a, alt = null) {
+  return {
+    id: text(a.id) || (alt && alt.id) || crypto.randomUUID(),
+    lieferant: a.lieferant !== undefined ? text(a.lieferant) : (alt ? alt.lieferant : ''),
+    betrag: a.betrag === '' || a.betrag === null || a.betrag === undefined
+      ? (alt ? alt.betrag : null) : Number(a.betrag),
+    // Ein Angebot kann netto ausgewiesen sein, während der Vorgang brutto
+    // rechnet (oder umgekehrt) — deshalb trägt es seine eigene Angabe.
+    preisArt: a.preisArt === 'brutto' ? 'brutto' : (a.preisArt === 'netto' ? 'netto' : (alt ? alt.preisArt : 'netto')),
+    datum: a.datum !== undefined ? text(a.datum) : (alt ? alt.datum : ''),
+    nummer: a.nummer !== undefined ? text(a.nummer) : (alt ? alt.nummer : ''),
+    notiz: a.notiz !== undefined ? text(a.notiz) : (alt ? alt.notiz : ''),
+    // Das Angebots-PDF liegt in Paperless, wie Lieferschein und Rechnung.
+    taskId: a.taskId !== undefined ? text(a.taskId) : (alt ? alt.taskId : ''),
+    dokumentId: a.dokumentId !== undefined ? (a.dokumentId ? Number(a.dokumentId) : null) : (alt ? alt.dokumentId : null),
+    fehler: alt ? alt.fehler : '',
+    gewaehlt: alt ? !!alt.gewaehlt : false,
+    erfasstAm: (alt && alt.erfasstAm) || nowIso(),
+  };
+}
+
 // Zustand aus den Positionen ableiten statt ihn zu speichern: gespeicherte
 // Zustände laufen früher oder später gegen die Daten, aus denen sie stammen.
 // `storniert` und `erledigt` sind die Ausnahme — die sind eine Entscheidung
@@ -62,6 +93,8 @@ function normPosition(p, alt = null) {
 function zustandBerechnen(b) {
   if (b.storniertAm) return 'storniert';
   if (b.erledigtAm) return 'erledigt';
+  // Ohne Bestelldatum ist noch nichts beauftragt — der Vorgang sammelt Angebote.
+  if (!b.bestelltAm) return 'anfrage';
   const pos = b.positionen || [];
   if (!pos.length) return 'offen';
   const geliefert = pos.reduce((s, p) => s + (p.geliefert || 0), 0);
@@ -74,7 +107,12 @@ function anreichern(b) {
   return {
     ...b,
     zustand: zustandBerechnen(b),
+    // Rohsumme in der Währung, die der Vorgang erfasst hat. Ob das netto oder
+    // brutto ist, sagt `preisArt` — und ohne die Angabe darf die Zahl nirgends
+    // auftauchen. Die Umrechnung macht die Oberfläche (SL.models.summen), damit
+    // der MwSt-Satz aus den Einstellungen nur an EINER Stelle angewandt wird.
     summe: pos.reduce((s, p) => s + (p.preis != null ? p.preis * p.menge : 0), 0),
+    anzahlAngebote: (b.angebote || []).length,
     offenePositionen: pos.filter(p => (p.geliefert || 0) < p.menge).length,
     einzulagern: pos.filter(p => (p.geliefert || 0) > 0 && !p.eingelagert).length,
   };
@@ -133,7 +171,9 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
     const b = holen(req, res);
     if (!b) return;
     let geaendert = false;
-    for (const beleg of b.belege || []) {
+    // Angebote tragen ihr PDF genauso wie Lieferschein und Rechnung — also
+    // dieselbe Nachverfolgung, in EINER Schleife über beide Listen.
+    for (const beleg of [...(b.belege || []), ...(b.angebote || [])]) {
       if (beleg.dokumentId || !beleg.taskId || beleg.fehler) continue;
       try {
         const t = await paperless.taskStatus(beleg.taskId);
@@ -151,11 +191,16 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
 
   // --- Anlegen und ändern -------------------------------------------------
   r.post('/', (req, res) => {
-    const { lieferant, bestelltAm, belegnummer, notiz, positionen } = req.body || {};
+    const { lieferant, bestelltAm, belegnummer, notiz, positionen, preisArt, alsAnfrage } = req.body || {};
     const b = {
       id: crypto.randomUUID(),
       lieferant: text(lieferant),
-      bestelltAm: text(bestelltAm) || heuteIso(),
+      // Als Anfrage angelegt heißt: noch kein Bestelldatum. Ein leeres
+      // `bestelltAm` ist hier also eine Aussage, kein fehlender Wert.
+      bestelltAm: alsAnfrage ? '' : (text(bestelltAm) || heuteIso()),
+      angefragtAm: nowIso(),
+      preisArt: preisArt === 'brutto' ? 'brutto' : 'netto',
+      angebote: [],
       belegnummer: text(belegnummer),
       notiz: text(notiz),
       positionen: (Array.isArray(positionen) ? positionen : []).map(p => normPosition(p)),
@@ -179,6 +224,9 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
     const { lieferant, bestelltAm, belegnummer, notiz, positionen } = req.body || {};
     if (lieferant !== undefined) b.lieferant = text(lieferant);
     if (bestelltAm !== undefined) b.bestelltAm = text(bestelltAm);
+    if (req.body && req.body.preisArt !== undefined) {
+      b.preisArt = req.body.preisArt === 'brutto' ? 'brutto' : 'netto';
+    }
     if (belegnummer !== undefined) b.belegnummer = text(belegnummer);
     if (notiz !== undefined) b.notiz = text(notiz);
 
@@ -308,6 +356,90 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
     const p = (b.positionen || []).find(x => x.id === req.params.positionId);
     if (!p) return res.status(404).json({ error: 'Position nicht gefunden.' });
     p.eingelagert = (req.body || {}).eingelagert !== false;
+    res.json(sichern(b, req));
+  });
+
+  // --- Angebote -----------------------------------------------------------
+  // Ab dem Schwellenwert der Schule (brutto) müssen mehrere Angebote vorliegen.
+  // Sie gehören VOR die Bestellung: man holt sie ein, vergleicht, und erst das
+  // Beauftragen macht aus der Anfrage eine Bestellung.
+  //
+  // Die Schwelle selbst prüft die App NICHT hier, sondern zeigt sie an: es gibt
+  // begründete Ausnahmen (Alleinanbieter, Folgebeschaffung), die ein Server
+  // nicht kennen kann. Gewarnt, nicht blockiert — wie bei doppelten IPs in der
+  // Netzübersicht und bei der Überentnahme.
+  r.post('/:id/angebot', (req, res) => {
+    const b = holen(req, res);
+    if (!b) return;
+    b.angebote = b.angebote || [];
+    const a = normAngebot(req.body || {});
+    a.erfasstVon = req.benutzer.name;
+    if (!a.lieferant) return res.status(400).json({ error: 'Ein Angebot braucht einen Lieferanten.' });
+    b.angebote.push(a);
+    res.json(sichern(b, req));
+  });
+
+  r.put('/:id/angebot/:angebotId', (req, res) => {
+    const b = holen(req, res);
+    if (!b) return;
+    const i = (b.angebote || []).findIndex(x => x.id === req.params.angebotId);
+    if (i < 0) return res.status(404).json({ error: 'Angebot nicht gefunden.' });
+    b.angebote[i] = normAngebot({ ...(req.body || {}), id: b.angebote[i].id }, b.angebote[i]);
+    res.json(sichern(b, req));
+  });
+
+  r.delete('/:id/angebot/:angebotId', (req, res) => {
+    const b = holen(req, res);
+    if (!b) return;
+    const a = (b.angebote || []).find(x => x.id === req.params.angebotId);
+    if (!a) return res.status(404).json({ error: 'Angebot nicht gefunden.' });
+    // Ein beauftragtes Angebot ist der Grund, warum die Bestellung so aussieht,
+    // wie sie aussieht — und der Nachweis gegenüber der Verwaltung. Es zu
+    // löschen, während die Bestellung darauf steht, hinterließe eine Vergabe
+    // ohne Grundlage.
+    if (a.gewaehlt && b.bestelltAm) {
+      return res.status(409).json({
+        error: 'Dieses Angebot ist beauftragt. Erst die Beauftragung zurücknehmen, dann löschen.',
+      });
+    }
+    b.angebote = b.angebote.filter(x => x.id !== a.id);
+    // Nur die Verknüpfung fällt weg; das PDF bleibt in Paperless.
+    res.json(sichern(b, req));
+  });
+
+  // Beauftragen: aus der Anfrage wird eine Bestellung. Lieferant und Bestell-
+  // datum kommen aus dem Angebot — genau das ist die Vergabeentscheidung.
+  r.post('/:id/angebot/:angebotId/beauftragen', (req, res) => {
+    const b = holen(req, res);
+    if (!b) return;
+    const a = (b.angebote || []).find(x => x.id === req.params.angebotId);
+    if (!a) return res.status(404).json({ error: 'Angebot nicht gefunden.' });
+
+    for (const x of b.angebote) x.gewaehlt = (x.id === a.id);
+    b.lieferant = a.lieferant || b.lieferant;
+    b.bestelltAm = text((req.body || {}).bestelltAm) || heuteIso();
+    b.beauftragtAm = nowIso();
+    b.beauftragtVon = req.benutzer.name;
+    // Die Begründung ist Pflicht, sobald NICHT das günstigste Angebot gewählt
+    // wurde — aber das entscheidet die Oberfläche, die die Beträge vergleichen
+    // kann. Hier wird sie nur mitgeschrieben.
+    if ((req.body || {}).begruendung !== undefined) b.vergabeBegruendung = text(req.body.begruendung);
+    res.json(sichern(b, req));
+  });
+
+  // Beauftragung zurücknehmen — der Vorgang ist wieder eine Anfrage.
+  r.post('/:id/anfrage', (req, res) => {
+    const b = holen(req, res);
+    if (!b) return;
+    if ((b.eingaenge || []).length) {
+      // Nach einem Wareneingang wäre das eine Lüge: es wurde geliefert, also
+      // wurde beauftragt.
+      return res.status(409).json({ error: 'Zu diesem Vorgang wurde bereits Ware gebucht — er lässt sich nicht mehr in eine Anfrage zurückversetzen.' });
+    }
+    for (const x of b.angebote || []) x.gewaehlt = false;
+    b.bestelltAm = '';
+    b.beauftragtAm = '';
+    b.beauftragtVon = '';
     res.json(sichern(b, req));
   });
 

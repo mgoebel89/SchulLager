@@ -19,11 +19,17 @@
 
     SL.export.pdfBasis.kopfzeile(ctx, 'Bestellanforderung', b.lieferant || '');
 
+    const w = SL.models.summen(b, SL.store.state.settings);
+    const pflicht = SL.models.angebotspflicht(b, SL.store.state.settings);
+
     ctx.merkmale([
       ['Lieferant', b.lieferant || '—'],
-      ['Bestelldatum', SL.ui.formatDatum(String(b.bestelltAm || '').slice(0, 10))],
+      ['Bestelldatum', b.bestelltAm ? SL.ui.formatDatum(String(b.bestelltAm).slice(0, 10)) : 'noch nicht beauftragt'],
       ['Bestellnummer', b.belegnummer || '—'],
       ['Angelegt von', b.angelegtVon || ''],
+      // Ohne diese Angabe wäre jede Zahl auf dem Blatt mehrdeutig — und die
+      // Verwaltung prüft die Angebotspflicht am BRUTTO-Wert.
+      ['Preisangaben', w.art === 'brutto' ? `brutto (inkl. ${SL.ui.formatZahl(w.satz, 0)} % MwSt.)` : `netto (zzgl. ${SL.ui.formatZahl(w.satz, 0)} % MwSt.)`],
     ], 2);
     ctx.abstand(3);
 
@@ -45,16 +51,53 @@
       // Summe nur, wenn überhaupt Preise da sind. Eine Null wäre eine Aussage,
       // die niemand geprüft hat — Positionen ohne Preis werden benannt.
       const mitPreis = positionen.filter(p => p.preis != null);
-      const summe = mitPreis.reduce((s, p) => s + p.preis * p.menge, 0);
       ctx.abstand(2);
       if (mitPreis.length) {
-        ctx.text(`Summe: ${SL.ui.formatZahl(summe, 2)} €`, { size: 11, stil: 'bold' });
+        ctx.text(`Summe: ${SL.ui.formatZahl(w.netto, 2)} € netto · ${SL.ui.formatZahl(w.brutto, 2)} € brutto`,
+          { size: 11, stil: 'bold' });
         if (mitPreis.length < positionen.length) {
           ctx.text(`${positionen.length - mitPreis.length} Position(en) ohne Preis — in der Summe nicht enthalten.`,
             { size: 9, farbe: [150, 90, 30] });
         }
       } else {
         ctx.text('Für keine Position ist ein Preis hinterlegt.', { size: 9, farbe: [110, 110, 110] });
+      }
+    }
+
+    // --- Angebote ---
+    // Der eigentliche Zweck dieses Blatts oberhalb der Schwelle: der Nachweis,
+    // dass verglichen wurde. Deshalb steht er auf der Bestellanforderung selbst
+    // und nicht nur in der App.
+    const angebote = b.angebote || [];
+    if (pflicht.pflichtig || angebote.length) {
+      ctx.abstand(3);
+      ctx.ueberschrift('Angebote', 13);
+      if (pflicht.pflichtig) {
+        ctx.text(`Ab ${SL.ui.formatZahl(pflicht.schwelle, 2)} € brutto sind ${pflicht.noetig} Angebote einzureichen.`,
+          { size: 9, farbe: [110, 110, 110] });
+      }
+      if (!angebote.length) {
+        ctx.text('Es liegen keine Angebote vor.', { size: 10, farbe: [170, 90, 30] });
+      } else {
+        const satz = Number((SL.store.state.settings || {}).mwstSatz) || 0;
+        const brutto = (a) => (a.betrag == null ? null
+          : (a.preisArt === 'brutto' ? a.betrag : a.betrag * (1 + satz / 100)));
+        ctx.tabelle(['Lieferant', 'Angebots-Nr.', 'Datum', 'Betrag brutto', 'Vergabe'],
+          angebote.map(a => [
+            a.lieferant || '',
+            a.nummer || '',
+            a.datum ? SL.ui.formatDatum(a.datum) : '',
+            brutto(a) != null ? SL.ui.formatZahl(brutto(a), 2) + ' €' : '',
+            a.gewaehlt ? 'beauftragt' : '',
+          ]), [34, 18, 14, 18, 16]);
+        if (!pflicht.erfuellt) {
+          ctx.abstand(1);
+          ctx.text(`Es fehlen noch ${pflicht.fehlend} Angebote.`, { size: 10, stil: 'bold', farbe: [170, 90, 30] });
+        }
+        if (b.vergabeBegruendung) {
+          ctx.abstand(1);
+          ctx.text('Begründung der Vergabe: ' + b.vergabeBegruendung, { size: 9.5 });
+        }
       }
     }
 

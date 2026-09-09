@@ -229,6 +229,34 @@ Der Weg einer Lieferung durch die App:
    Position** — etwas, das es im Lager noch nicht gibt. Für die Verwaltung
    fällt eine *Bestellanforderung als PDF* ab.
 
+   Ob die erfassten Preise **netto oder brutto** sind, entscheidet jede
+   Bestellung für sich — der eine Lieferant weist es so aus, der andere anders.
+   Die App zeigt deshalb **jede Summe mit beiden Werten** und schreibt an keine
+   Zahl nur „€".
+
+1a. **Angebote und die 3000-€-Grenze.** Ab einem Bestellwert von 3000 € **brutto**
+   verlangt die Schule drei Vergleichsangebote (Schwelle, Anzahl und
+   Steuersatz stehen in *Einstellungen → Allgemein*). Die holt man **vor** der
+   Bestellung ein, deshalb kann ein Vorgang als **Anfrage** beginnen: Positionen
+   stehen fest, der Lieferant nicht.
+
+   Zu jedem Angebot werden Lieferant, Summe (netto oder brutto), Nummer und
+   Datum erfasst; das Angebots-PDF geht nach Paperless. Die App rechnet alle
+   Angebote auf brutto um, kennzeichnet das **günstigste** und sagt, wie viele
+   noch fehlen. **Beauftragen** macht aus der Anfrage die Bestellung und setzt
+   den Lieferanten aus dem gewählten Angebot. Wird nicht das günstigste
+   beauftragt, verlangt die App eine **Begründung** — genau danach fragt die
+   Verwaltung später, und im Nachhinein weiß es niemand mehr.
+
+   Gewarnt wird, blockiert nicht: es gibt begründete Ausnahmen (Alleinanbieter,
+   Ersatzteil zum vorhandenen Gerät), die eine Software nicht kennen kann. Die
+   Bestellanforderung führt die Angebote mit auf, samt Hinweis, wenn welche
+   fehlen.
+
+   **Achtung, der Grenzfall:** 2.994 € netto liegen *unter* 3000 — brutto sind
+   es 3.562,86 € und damit *darüber*. Genau deshalb rechnet die Prüfung immer
+   am Bruttowert.
+
 2. **Wareneingang.** Lieferschein daneben, Bestellung öffnen, *Wareneingang*.
    Die bestellten Positionen sind die führende Liste; ein Scan zählt die
    passende Zeile hoch. Gescannt wird **auf zwei Wegen**: mit der Kamera wie im
@@ -316,9 +344,10 @@ wandern können.
       Abweichungsliste, Übernahme der gezählten Bestände und Protokoll-PDF.
 - [x] **CSV-Import** für Komponenten samt Beispieldatei.
 - [x] **Phase 6 — Beschaffung und Dokumente:** Bestellungen mit Positionen und
-      Bestellanforderung als PDF, Wareneingang gegen den Lieferschein (Kamera
-      ODER Handscanner, unbekannte Codes werden angelernt), Einlagern-Liste
-      nach Lagerort, Rechnung mit Preisnachtrag, Belegablage in Paperless.
+      Bestellanforderung als PDF, Angebote mit Vergabeentscheidung ab der
+      3000-€-Grenze, Wareneingang gegen den Lieferschein (Kamera ODER
+      Handscanner, unbekannte Codes werden angelernt), Einlagern-Liste nach
+      Lagerort, Rechnung mit Preisnachtrag, Belegablage in Paperless.
 - [ ] Phase 3 — Etiketten (ans Ende geschoben; braucht die genauen
       Brother-Modelle)
 

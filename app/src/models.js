@@ -27,6 +27,12 @@
       // Eigener Tag, weil ein nacktes Board kein Demonstrator ist — aber
       // ebenfalls ausleihbar und mit eigenem Raum.
       netzgeraetMarke: 'Netzgerät',
+      // Beschaffung: ab welchem BRUTTO-Bestellwert die Schule mehrere Angebote
+      // verlangt, und wie viele. Steht in den Einstellungen, weil eine
+      // Vergabegrenze eine Verwaltungsvorgabe ist und keine Naturkonstante.
+      angebotSchwelle: 3000,
+      angebotAnzahl: 3,
+      mwstSatz: 19,
       schemaVersion: 1,
     };
   }
@@ -43,6 +49,11 @@
     // dann lieber auf die Voreinstellung zurückfallen.
     if (!String(out.demonstratorMarke || '').trim()) out.demonstratorMarke = d.demonstratorMarke;
     if (!String(out.netzgeraetMarke || '').trim()) out.netzgeraetMarke = d.netzgeraetMarke;
+    // Eine Schwelle von 0 hieße „immer Angebote nötig", ein leerer Wert „nie".
+    // Beides ist fast sicher ein Versehen, deshalb zurück auf die Vorgabe.
+    if (!(Number(out.angebotSchwelle) > 0)) out.angebotSchwelle = d.angebotSchwelle;
+    if (!(Number(out.angebotAnzahl) > 0)) out.angebotAnzahl = d.angebotAnzahl;
+    if (!(Number(out.mwstSatz) >= 0)) out.mwstSatz = d.mwstSatz;
     return out;
   }
 
@@ -157,6 +168,49 @@
     return { art: 'barcode', wert: t };
   }
 
+  // --- Beschaffung ----------------------------------------------------------
+  // Netto oder brutto entscheidet die einzelne Bestellung (`preisArt`), weil
+  // der eine Lieferant so anbietet und der andere anders.
+  //
+  // DESHALB GILT: eine Summe wird in dieser App NIE ohne das Wort „netto" oder
+  // „brutto" angezeigt. Eine nackte Zahl wäre hier mehrdeutig, und genau an
+  // dieser Mehrdeutigkeit hängt die Angebotspflicht.
+  function summen(bestellung, settings) {
+    const s = settings || {};
+    const satz = Number(s.mwstSatz != null ? s.mwstSatz : 19) || 0;
+    const art = bestellung && bestellung.preisArt === 'brutto' ? 'brutto' : 'netto';
+    const roh = (bestellung && bestellung.positionen || [])
+      .reduce((acc, p) => acc + (p.preis != null ? p.preis * p.menge : 0), 0);
+    return art === 'brutto'
+      ? { art, netto: roh / (1 + satz / 100), brutto: roh, erfasst: roh, satz }
+      : { art, netto: roh, brutto: roh * (1 + satz / 100), erfasst: roh, satz };
+  }
+
+  // Verlangt die Schule für diesen Vorgang mehrere Angebote? Gerechnet wird
+  // immer am BRUTTO-Wert — so steht es in der Vorgabe.
+  function angebotspflicht(bestellung, settings) {
+    const s = settings || {};
+    const schwelle = Number(s.angebotSchwelle) || 0;
+    const noetig = Number(s.angebotAnzahl) || 0;
+    const brutto = summen(bestellung, s).brutto;
+    const vorhanden = ((bestellung && bestellung.angebote) || []).length;
+    const pflichtig = schwelle > 0 && brutto >= schwelle;
+    return {
+      pflichtig,
+      schwelle,
+      brutto,
+      noetig,
+      vorhanden,
+      fehlend: pflichtig ? Math.max(0, noetig - vorhanden) : 0,
+      erfuellt: !pflichtig || vorhanden >= noetig,
+    };
+  }
+
+  // Ein Vorgang ohne Bestelldatum ist noch eine ANFRAGE: Positionen stehen
+  // fest, der Lieferant nicht. Er wird erst zur Bestellung, wenn ein Angebot
+  // beauftragt wird.
+  function istAnfrage(bestellung) { return !!bestellung && !bestellung.bestelltAm; }
+
   // --- Ausleihe -------------------------------------------------------------
   // Eine Ausleihe verändert den Bestand NICHT. Ein Demonstrator, der im
   // Unterricht steht, gehört weiterhin zum Inventar — er ist nur nicht im
@@ -214,5 +268,6 @@
     codeArt,
     LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
     istDemonstrator, geraeteArt, istGeraet, GERAET_LABEL,
+    summen, angebotspflicht, istAnfrage,
   };
 })();

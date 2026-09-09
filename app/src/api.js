@@ -163,6 +163,11 @@
   const wareneingang = (id, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/eingang`, { method: 'POST', body: d });
   const positionEingelagert = (id, positionId, eingelagert) =>
     jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/position/${encodeURIComponent(positionId)}/eingelagert`, { method: 'POST', body: { eingelagert } });
+  const angebotAnlegen = (id, a) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/angebot`, { method: 'POST', body: a });
+  const angebotSpeichern = (id, aid, a) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/angebot/${encodeURIComponent(aid)}`, { method: 'PUT', body: a });
+  const angebotLoeschen = (id, aid) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/angebot/${encodeURIComponent(aid)}`, { method: 'DELETE' });
+  const angebotBeauftragen = (id, aid, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/angebot/${encodeURIComponent(aid)}/beauftragen`, { method: 'POST', body: d || {} });
+  const zurueckZurAnfrage = (id) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/anfrage`, { method: 'POST' });
   const belegVerknuepfen = (id, b) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg`, { method: 'POST', body: b });
   const belegLoesen = (id, belegId) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg/${encodeURIComponent(belegId)}`, { method: 'DELETE' });
   const rechnungZuordnen = (id, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/rechnung`, { method: 'POST', body: d });
@@ -279,6 +284,7 @@
     listBestellungen, getBestellung, bestellungAnlegen, bestellungSpeichern,
     bestellungZustand, bestellungLoeschen, wareneingang, positionEingelagert,
     belegVerknuepfen, belegLoesen, rechnungZuordnen, lagerLieferanten,
+    angebotAnlegen, angebotSpeichern, angebotLoeschen, angebotBeauftragen, zurueckZurAnfrage,
     paperlessConfig, putPaperlessConfig, paperlessStammlisten, paperlessTest,
     paperlessHealth, paperlessDokument, paperlessTask, paperlessDateiUrl, belegHochladen,
     listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
