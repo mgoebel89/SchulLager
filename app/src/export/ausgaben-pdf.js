@@ -77,7 +77,7 @@
           e.kosten ? euro(e.kosten) : (e.ohnePreis ? 'kein Preis hinterlegt' : '—'),
         ]);
 
-      ctx.tabelle(['Artikel', 'Menge', 'Materialwert'], summenZeilen, [62, 14, 24]);
+      ctx.tabelle(['Artikel', 'Menge', 'Materialwert'], summenZeilen, [62, 14, 24], { rechts: [1, 2] });
 
       const kostenGruppe = [...proArtikel.values()].reduce((s, e) => s + e.kosten, 0);
       const ohnePreis = [...proArtikel.values()].reduce((s, e) => s + e.ohnePreis, 0);
@@ -105,7 +105,7 @@
           a.notiz || '',
           a.benutzerName || '',
         ]);
-      ctx.tabelle(['Datum', 'Artikel', 'Menge', 'Zweck', 'Gebucht von'], einzel, [14, 30, 9, 27, 20]);
+      ctx.tabelle(['Datum', 'Artikel', 'Menge', 'Zweck', 'Gebucht von'], einzel, [14, 30, 9, 27, 20], { rechts: [2] });
     }
 
     // Gesamtsumme auf einer eigenen Seite: sonst hängt sie unter der letzten
@@ -126,7 +126,7 @@
         + ((a.preis != null && a.preis !== '') ? (Number(a.preis) || 0) * (Number(a.menge) || 0) : 0), 0);
       return [name, String(eintraege.length), euro(summe)];
     }).sort((a, b) => a[0].localeCompare(b[0], 'de'));
-    ctx.tabelle(['Gruppe', 'Buchungen', 'Materialwert'], je, [50, 20, 30]);
+    ctx.tabelle(['Gruppe', 'Buchungen', 'Materialwert'], je, [50, 20, 30], { rechts: [1, 2] });
 
     SL.export.pdfBasis.ausgeben(ctx, dateiname(von, bis));
     return ctx;

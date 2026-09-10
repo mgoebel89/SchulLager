@@ -48,7 +48,7 @@
           String(p.ist),
           (p.ist - p.soll > 0 ? '+' : '') + String(p.ist - p.soll),
         ]);
-      ctx.tabelle(['Artikel', 'Lagerort', 'Verzeichnet', 'Gezählt', 'Differenz'], zeilen, [34, 26, 13, 13, 14]);
+      ctx.tabelle(['Artikel', 'Lagerort', 'Verzeichnet', 'Gezählt', 'Differenz'], zeilen, [34, 26, 13, 13, 14], { rechts: [2, 3, 4] });
     }
 
     // --- Vollständige Zählliste, nach Lagerort ---
@@ -84,6 +84,7 @@
           p.gezaehltVon || '',
         ]),
         [34, 13, 13, 15, 25],
+        { rechts: [1, 2] },
       );
     }
 

@@ -113,39 +113,66 @@
       },
 
       // Schlichte Tabelle mit Kopfzeile; Spaltenbreiten in Prozent.
+      //
+      // GEOMETRIE (2026-09-10 korrigiert, nachdem die Linien auf der
+      // Bestellanforderung sichtbar zur falschen Zeile gehörten):
+      // `this.y` ist die OBERKANTE der Zeile, nicht die Schriftlinie. Die
+      // Schriftlinie liegt PAD + Versalhöhe darunter, die Trennlinie genau auf
+      // der Unterkante. Dadurch hat jede Zeile oben und unten gleich viel Luft
+      // und die Linie steht mittig zwischen zwei Zeilen. Vorher wurde sie nach
+      // dem Vorschub bei `y - 1,5` gezogen — also 1,5 mm über der FOLGENDEN
+      // Schriftlinie und rund 5 mm unter der eigenen.
+      //
+      // `opt.rechts` nennt die Spalten (Index), die rechtsbündig stehen: Menge,
+      // Preise, Beträge. Untereinander lesbare Zahlen sind der ganze Zweck.
       tabelle(kopf, zeilen, breitenProzent, opt = {}) {
         const b = breitenProzent.map(p => this.nutzbreite * p / 100);
-        const zh = opt.zeilenHoehe || 5.5;
+        const size = opt.size || 8.5;
+        const PAD = 1.6;                 // Luft über und unter dem Text
+        const ZA = size * 0.42 + 0.3;    // Abstand mehrzeiliger Zellen
+        const VERSAL = size * 0.25;      // Versalhöhe in mm (mm = pt * 0.3528)
+        const rechtsSpalten = new Set(opt.rechts || []);
+        // Linke Kante jeder Spalte, einmal gerechnet statt in jeder Zeile.
+        const kanten = [];
+        b.reduce((x, breite) => { kanten.push(x); return x + breite; }, this.links);
+
+        // Setzt eine Zelle an ihrer Kante ab — links- oder rechtsbündig.
+        const zelle = (txt, i, y) => {
+          if (rechtsSpalten.has(i)) doc.text(txt, kanten[i] + b[i] - 1, y, { align: 'right' });
+          else doc.text(txt, kanten[i] + 1, y);
+        };
+
+        const zeilenHoehe = (n) => PAD * 2 + VERSAL + (n - 1) * ZA;
 
         const kopfZeichnen = () => {
-          this.platz(zh + 2);
+          const hoehe = zeilenHoehe(1);
+          this.platz(hoehe + 2);
           doc.setFillColor(238, 242, 247);
-          doc.rect(this.links, this.y - 3.6, this.nutzbreite, zh, 'F');
-          doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+          doc.rect(this.links, this.y, this.nutzbreite, hoehe, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(size);
           doc.setTextColor(36, 65, 104);
-          let x = this.links + 1;
-          kopf.forEach((h, i) => { doc.text(String(h), x, this.y); x += b[i]; });
-          this.y += zh;
+          const basis = this.y + PAD + VERSAL;
+          kopf.forEach((h, i) => zelle(String(h), i, basis));
+          this.y += hoehe;
         };
         kopfZeichnen();
 
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(size);
         for (const zeile of zeilen) {
           // Höchste Zelle bestimmt die Zeilenhöhe — sonst überlappt langer Text.
           const teile = zeile.map((z, i) => doc.splitTextToSize(String(z ?? ''), b[i] - 2));
-          const zeilen_ = Math.max(...teile.map(t => t.length), 1);
-          const hoehe = zeilen_ * 3.6 + 2;
-          if (this.platz(hoehe)) { kopfZeichnen(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); }
+          const hoehe = zeilenHoehe(Math.max(...teile.map(t => t.length), 1));
+          if (this.platz(hoehe)) { kopfZeichnen(); doc.setFont('helvetica', 'normal'); doc.setFontSize(size); }
           doc.setTextColor(20, 20, 20);
-          let x = this.links + 1;
-          teile.forEach((t, i) => {
-            t.forEach((zz, k) => doc.text(zz, x, this.y + k * 3.6));
-            x += b[i];
-          });
+          const basis = this.y + PAD + VERSAL;
+          teile.forEach((t, i) => t.forEach((zz, k) => zelle(zz, i, basis + k * ZA)));
           this.y += hoehe;
           doc.setDrawColor(225);
-          doc.line(this.links, this.y - 1.5, this.rechts, this.y - 1.5);
+          doc.line(this.links, this.y, this.rechts, this.y);
         }
+        // Die Tabelle endet mit ihrer Schlusslinie — ohne diesen Nachlauf säße
+        // die nächste Zeile (typisch: „Summe: …") auf der Linie.
+        this.y += 2;
         return this;
       },
     };

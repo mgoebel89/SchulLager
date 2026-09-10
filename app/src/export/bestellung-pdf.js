@@ -46,7 +46,7 @@
         p.preis != null ? SL.ui.formatZahl(p.preis * p.menge, 2) + ' €' : '',
       ]);
       ctx.tabelle(['Pos.', 'Bezeichnung', 'Bestell-Nr.', 'Menge', 'Einzelpreis', 'Gesamt'],
-        zeilen, [7, 39, 18, 10, 13, 13]);
+        zeilen, [7, 39, 18, 10, 13, 13], { rechts: [3, 4, 5] });
 
       // Summe nur, wenn überhaupt Preise da sind. Eine Null wäre eine Aussage,
       // die niemand geprüft hat — Positionen ohne Preis werden benannt.
@@ -89,7 +89,7 @@
             a.datum ? SL.ui.formatDatum(a.datum) : '',
             brutto(a) != null ? SL.ui.formatZahl(brutto(a), 2) + ' €' : '',
             a.gewaehlt ? 'beauftragt' : '',
-          ]), [34, 18, 14, 18, 16]);
+          ]), [34, 18, 14, 18, 16], { rechts: [3] });
         if (!pflicht.erfuellt) {
           ctx.abstand(1);
           ctx.text(`Es fehlen noch ${pflicht.fehlend} Angebote.`, { size: 10, stil: 'bold', farbe: [170, 90, 30] });
