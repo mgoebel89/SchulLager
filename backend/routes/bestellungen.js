@@ -465,6 +465,23 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
     res.json(sichern(b, req));
   });
 
+  // Die Verknüpfung nachtragen: für Belege, deren Vorgangsnummer nichts mehr
+  // hergibt (Paperless vergisst erledigte Uploads) und die über den Titel
+  // wiedergefunden wurden. Ohne diesen Weg stünde „wird verarbeitet" für immer.
+  r.put('/:id/beleg/:belegId', (req, res) => {
+    const b = holen(req, res);
+    if (!b) return;
+    const beleg = (b.belege || []).find(x => x.id === req.params.belegId);
+    if (!beleg) return res.status(404).json({ error: 'Beleg nicht gefunden.' });
+    const { dokumentId, titel } = req.body || {};
+    if (dokumentId !== undefined) beleg.dokumentId = dokumentId ? Number(dokumentId) : null;
+    if (titel !== undefined) beleg.titel = text(titel);
+    // Eine gefundene Nummer beendet den Fehlerzustand — sonst bliebe die alte
+    // Meldung neben einem Beleg stehen, den man ansehen kann.
+    if (beleg.dokumentId) beleg.fehler = '';
+    res.json(sichern(b, req));
+  });
+
   // Nur die VERKNÜPFUNG lösen. Das Dokument bleibt in Paperless — diese App
   // löscht dort nichts; die Ablage der Schule gehört nicht ihr.
   r.delete('/:id/beleg/:belegId', (req, res) => {

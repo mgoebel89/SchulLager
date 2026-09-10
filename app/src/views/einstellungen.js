@@ -204,14 +204,18 @@
         v => { gewaehlt.typLieferscheinId = Number(v) || 0; }, { leerLabel: '— kein Typ —' });
       const typR = select(stamm.dokumenttypen.map(t => ({ wert: t.id, label: t.name })), gewaehlt.typRechnungId,
         v => { gewaehlt.typRechnungId = Number(v) || 0; }, { leerLabel: '— kein Typ —' });
+      const typA = select(stamm.dokumenttypen.map(t => ({ wert: t.id, label: t.name })), gewaehlt.typAngebotId,
+        v => { gewaehlt.typAngebotId = Number(v) || 0; }, { leerLabel: '— kein Typ —' });
 
       listenBox.appendChild(karte('Zuordnung', [
-        el('p', { class: 'muted' }, 'Jeder Beleg aus dieser App bekommt automatisch diesen Tag und diesen Ablagepfad. '
+        el('p', { class: 'muted' }, 'Das ist die VORBELEGUNG des Upload-Fensters: Tag, Ablagepfad und Dokumenttyp stehen '
+          + 'beim Hochladen schon da und lassen sich dort für den einzelnen Beleg ändern. '
           + 'So bleiben die Lagerbelege in Paperless auffindbar, ohne dass jemand nachsortieren muss.'),
         feld('Tag für Uploads', tagWahl),
         feld('Ablagepfad', pfadWahl),
         feld('Dokumenttyp Lieferschein', typL),
         feld('Dokumenttyp Rechnung', typR),
+        feld('Dokumenttyp Angebot', typA),
         el('div', { class: 'btn-reihe' }, [
           el('button', {
             class: 'btn btn-primary', type: 'button',
@@ -222,6 +226,7 @@
                   ablagepfadId: gewaehlt.ablagepfadId,
                   typLieferscheinId: gewaehlt.typLieferscheinId,
                   typRechnungId: gewaehlt.typRechnungId,
+                  typAngebotId: gewaehlt.typAngebotId,
                 });
                 toast('Zuordnung gespeichert.');
               } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }

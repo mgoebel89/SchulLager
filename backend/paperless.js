@@ -48,6 +48,7 @@ function getConfig() {
     ablagepfadId: Number(c.ablagepfadId) || 0,
     typLieferscheinId: Number(c.typLieferscheinId) || 0,
     typRechnungId: Number(c.typRechnungId) || 0,
+    typAngebotId: Number(c.typAngebotId) || 0,
   };
 }
 
@@ -61,6 +62,7 @@ function publicConfig() {
     ablagepfadId: c.ablagepfadId,
     typLieferscheinId: c.typLieferscheinId,
     typRechnungId: c.typRechnungId,
+    typAngebotId: c.typAngebotId,
     eingerichtet: isConfigured(),
   };
 }
@@ -76,6 +78,7 @@ function setConfig(patch = {}) {
     ablagepfadId: patch.ablagepfadId !== undefined ? Number(patch.ablagepfadId) || 0 : alt.ablagepfadId,
     typLieferscheinId: patch.typLieferscheinId !== undefined ? Number(patch.typLieferscheinId) || 0 : alt.typLieferscheinId,
     typRechnungId: patch.typRechnungId !== undefined ? Number(patch.typRechnungId) || 0 : alt.typRechnungId,
+    typAngebotId: patch.typAngebotId !== undefined ? Number(patch.typAngebotId) || 0 : alt.typAngebotId,
   };
   db.savePaperlessConfig(neu);
   return publicConfig();
@@ -152,15 +155,46 @@ async function alleSeiten(pfad) {
 
 const schlank = (liste) => liste.map(x => ({ id: x.id, name: x.name }));
 
-// Tags, Ablagepfade und Dokumenttypen — für die Auswahl in den Einstellungen.
+// Tags, Korrespondenten, Ablagepfade und Dokumenttypen — für die Einstellungen
+// UND für das Upload-Fenster. Deshalb ist das hier nichts Administratives mehr:
+// wer einen Beleg ablegen darf, muss die Listen sehen können.
 async function stammlisten() {
-  const [tags, pfade, typen] = await Promise.all([
+  const [tags, korr, pfade, typen] = await Promise.all([
     alleSeiten('/api/tags/'),
+    alleSeiten('/api/correspondents/').catch(() => []),
     alleSeiten('/api/storage_paths/').catch(() => []),
     alleSeiten('/api/document_types/').catch(() => []),
   ]);
-  return { tags: schlank(tags), ablagepfade: schlank(pfade), dokumenttypen: schlank(typen) };
+  return {
+    tags: schlank(tags),
+    korrespondenten: schlank(korr),
+    ablagepfade: schlank(pfade),
+    dokumenttypen: schlank(typen),
+  };
 }
+
+// --- Stammdaten anlegen ---------------------------------------------------
+// Ein Angebot von einem Lieferanten, den Paperless noch nicht kennt, soll nicht
+// am Rechteproblem scheitern — deshalb darf jede Lehrkraft anlegen (so mit
+// Matthias entschieden). Die Doubletten-Gefahr („Igus" / „igus GmbH") fängt der
+// Aufrufer ab: `suchen` liefert einen vorhandenen Eintrag mit gleichem Namen
+// zurück, statt einen zweiten zu erzeugen.
+const flach = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+async function stammAnlegen(pfad, name) {
+  const sauber = String(name || '').trim();
+  if (!sauber) throw new PaperlessError('Es fehlt der Name.', 400);
+  // Erst nachsehen: Paperless selbst weist Doubletten mit 400 ab, und diese
+  // Meldung wäre für die Lehrkraft nicht zu deuten.
+  const da = (await alleSeiten(pfad)).find(x => flach(x.name) === flach(sauber));
+  if (da) return { id: da.id, name: da.name, vorhanden: true };
+  const d = await call(pfad, { method: 'POST', body: { name: sauber } });
+  if (!d || !d.id) throw new PaperlessError('Paperless hat keinen Eintrag angelegt.', 502);
+  return { id: d.id, name: d.name || sauber, vorhanden: false };
+}
+
+const tagAnlegen = (name) => stammAnlegen('/api/tags/', name);
+const korrespondentAnlegen = (name) => stammAnlegen('/api/correspondents/', name);
 
 async function test() {
   const d = await call('/api/documents/', { params: { page_size: 1 } });
@@ -168,17 +202,31 @@ async function test() {
 }
 
 // --- Upload ---------------------------------------------------------------
-// Upload-Tag und Ablagepfad werden IMMER mitgegeben — genau dafür gibt es die
-// Einstellung. Zurück kommt die Task-UUID, nicht die Dokument-Nummer.
-async function hochladen({ daten, dateiname, mimetype, titel = '', erstellt = '', typId = 0 }) {
+// Was der Nutzer im Upload-Fenster gewählt hat, hat Vorrang; die Einstellungen
+// sind nur noch die Vorbelegung. `tagIds` ist eine LISTE — mehrere Tags werden
+// als mehrere `tags`-Felder gesendet, so erwartet Paperless das.
+// Zurück kommt die Task-UUID, nicht die Dokument-Nummer.
+async function hochladen({
+  daten, dateiname, mimetype, titel = '', erstellt = '',
+  typId = 0, korrespondentId = 0, ablagepfadId = null, tagIds = null,
+}) {
   const cfg = pflichtConfig();
   const form = new FormData();
   form.append('document', new Blob([daten], { type: mimetype || 'application/octet-stream' }), dateiname || 'beleg.pdf');
   if (String(titel).trim()) form.append('title', String(titel).trim());
   if (String(erstellt).trim()) form.append('created', String(erstellt).trim());
   if (typId) form.append('document_type', String(typId));
-  if (cfg.ablagepfadId) form.append('storage_path', String(cfg.ablagepfadId));
-  if (cfg.uploadTagId) form.append('tags', String(cfg.uploadTagId));
+  if (korrespondentId) form.append('correspondent', String(korrespondentId));
+
+  const pfad = ablagepfadId === null || ablagepfadId === undefined ? cfg.ablagepfadId : Number(ablagepfadId) || 0;
+  if (pfad) form.append('storage_path', String(pfad));
+
+  // null heißt „keine Angabe" und fällt auf den Einstellungs-Tag zurück; eine
+  // leere Liste heißt „bewusst ohne Tag" und bleibt leer.
+  const tags = tagIds === null || tagIds === undefined
+    ? (cfg.uploadTagId ? [cfg.uploadTagId] : [])
+    : tagIds.map(Number).filter(Boolean);
+  for (const t of [...new Set(tags)]) form.append('tags', String(t));
 
   const d = await call('/api/documents/post_document/', { method: 'POST', form });
   const taskId = String(d.raw || d.task_id || '');
@@ -189,11 +237,25 @@ async function hochladen({ daten, dateiname, mimetype, titel = '', erstellt = ''
 // Status eines Uploads. `dokumentId` bleibt null, solange Paperless noch
 // verarbeitet — das ist kein Fehler, sondern der Normalfall der ersten
 // Sekunden.
+//
+// FALLE (dieselbe wie bei Homebox): ein Filterparameter, den der Server nicht
+// kennt, wird still IGNORIERT. Dann käme hier die ungefilterte Aufgabenliste
+// zurück und „items[0]" wäre irgendein fremder Vorgang — im besten Fall bliebe
+// der Beleg ewig auf „wird verarbeitet", im schlimmsten bekäme er die
+// Dokumentnummer eines anderen. Deshalb wird der Treffer gegen die UUID
+// geprüft, statt dem ersten zu glauben.
 async function taskStatus(taskId) {
-  const d = await call('/api/tasks/', { params: { task_id: taskId } });
+  const gesucht = String(taskId || '').trim();
+  if (!gesucht) return { status: 'PENDING', dokumentId: null, fehler: '' };
+  const d = await call('/api/tasks/', { params: { task_id: gesucht } });
   const items = Array.isArray(d.results) ? d.results : (Array.isArray(d) ? d : []);
-  if (!items.length) return { status: 'PENDING', dokumentId: null, fehler: '' };
-  const t = items[0];
+  const t = items.find(x => String(x && x.task_id || '').trim() === gesucht);
+  if (!t) {
+    // Kein passender Vorgang: entweder noch nicht in der Liste, oder Paperless
+    // hat ihn nach der Aufbewahrungsfrist vergessen. Beides ist kein Fehler,
+    // den man dem Nutzer vorwerfen könnte — der Aufrufer entscheidet.
+    return { status: 'PENDING', dokumentId: null, fehler: '', unbekannt: items.length > 0 };
+  }
   return {
     status: t.status || 'PENDING',
     dokumentId: t.related_document || null,
@@ -201,15 +263,47 @@ async function taskStatus(taskId) {
   };
 }
 
-async function dokument(id) {
-  const d = await call(`/api/documents/${Number(id)}/`);
+function schlankesDokument(d) {
   return {
     id: d.id,
     titel: d.title || '',
-    erstellt: (d.created_date || d.created || '').slice(0, 10),
+    erstellt: String(d.created_date || d.created || '').slice(0, 10),
     typId: d.document_type || 0,
+    korrespondentId: d.correspondent || 0,
+    ablagepfadId: d.storage_path || 0,
+    tagIds: Array.isArray(d.tags) ? d.tags : [],
     dateiname: d.original_file_name || '',
   };
+}
+
+async function dokument(id) {
+  return schlankesDokument(await call(`/api/documents/${Number(id)}/`));
+}
+
+// Nachträglich ändern — für Belege, deren Angaben beim Hochladen nicht stimmten.
+// Nur diese Felder: die App ist eine Ablagehilfe, kein Paperless-Ersatz.
+async function dokumentAendern(id, patch = {}) {
+  const body = {};
+  if (patch.titel !== undefined) body.title = String(patch.titel || '').trim();
+  if (patch.erstellt) body.created_date = String(patch.erstellt).slice(0, 10);
+  if (patch.typId !== undefined) body.document_type = Number(patch.typId) || null;
+  if (patch.korrespondentId !== undefined) body.correspondent = Number(patch.korrespondentId) || null;
+  if (patch.ablagepfadId !== undefined) body.storage_path = Number(patch.ablagepfadId) || null;
+  if (Array.isArray(patch.tagIds)) body.tags = [...new Set(patch.tagIds.map(Number).filter(Boolean))];
+  if (!Object.keys(body).length) return dokument(id);
+  return schlankesDokument(await call(`/api/documents/${Number(id)}/`, { method: 'PATCH', body }));
+}
+
+// Rettungsweg für Belege, deren Vorgangsnummer nichts mehr hergibt: Paperless
+// vergisst erledigte Aufgaben nach einer Weile, die Datei liegt aber längst da.
+// Gesucht wird über den Titel, den die App beim Upload selbst vergeben hat.
+async function dokumenteSuchen(titel, grenze = 5) {
+  const t = String(titel || '').trim();
+  if (!t) return [];
+  const d = await call('/api/documents/', {
+    params: { title__icontains: t, page_size: grenze, ordering: '-created' },
+  });
+  return (d.results || []).slice(0, grenze).map(schlankesDokument);
 }
 
 // Vorschau, Miniatur oder Original. Läuft über den Server, damit der Browser
@@ -234,5 +328,7 @@ async function datei(id, art = 'preview') {
 module.exports = {
   PaperlessError,
   publicConfig, setConfig, isConfigured,
-  stammlisten, test, hochladen, taskStatus, dokument, datei,
+  stammlisten, tagAnlegen, korrespondentAnlegen,
+  test, hochladen, taskStatus,
+  dokument, dokumentAendern, dokumenteSuchen, datei,
 };

@@ -29,10 +29,32 @@ module.exports = function createDokumenteRouter() {
   // --- Einrichtung (Admin) ------------------------------------------------
   r.get('/config', auth.requireRolle('admin'), (_req, res) => res.json(paperless.publicConfig()));
   r.put('/config', auth.requireRolle('admin'), (req, res) => res.json(paperless.setConfig(req.body || {})));
-  r.get('/stammlisten', auth.requireRolle('admin'), fang(async (_req, res) => {
+  r.get('/test', auth.requireRolle('admin'), fang(async (_req, res) => res.json(await paperless.test())));
+
+  // --- Stammlisten (jede Lehrkraft) ---------------------------------------
+  // Nicht mehr nur für die Einstellungen: das Upload-Fenster braucht Tags,
+  // Korrespondenten, Ablagepfade und Typen zur Auswahl. Wer Belege ablegen
+  // darf, muss die Listen sehen.
+  r.get('/stammlisten', auth.requireAuth, fang(async (_req, res) => {
     res.json(await paperless.stammlisten());
   }));
-  r.get('/test', auth.requireRolle('admin'), fang(async (_req, res) => res.json(await paperless.test())));
+
+  // Neuen Tag / Korrespondenten anlegen. Bewusst für jede Lehrkraft: ein
+  // Angebot von einem noch unbekannten Lieferanten soll nicht am Recht
+  // scheitern. Gibt es den Namen schon, kommt der vorhandene Eintrag zurück
+  // (`vorhanden: true`) statt einer zweiten Karteikarte.
+  r.post('/tags', auth.requireAuth, fang(async (req, res) => {
+    res.json(await paperless.tagAnlegen((req.body || {}).name));
+  }));
+  r.post('/korrespondenten', auth.requireAuth, fang(async (req, res) => {
+    res.json(await paperless.korrespondentAnlegen((req.body || {}).name));
+  }));
+
+  // Suche über den Titel — der Rettungsweg für Belege, deren Vorgangsnummer
+  // Paperless nicht mehr kennt.
+  r.get('/suche', auth.requireAuth, fang(async (req, res) => {
+    res.json(await paperless.dokumenteSuchen(String(req.query.titel || '')));
+  }));
 
   // --- Zustand ------------------------------------------------------------
   // Damit die Oberfläche „Paperless ist nicht eingerichtet" sagen kann, statt
@@ -44,6 +66,11 @@ module.exports = function createDokumenteRouter() {
   // --- Einzeldokument -----------------------------------------------------
   r.get('/:id(\\d+)', auth.requireAuth, fang(async (req, res) => {
     res.json(await paperless.dokument(req.params.id));
+  }));
+
+  // Angaben eines abgelegten Belegs nachbessern (Titel, Tags, Korrespondent …).
+  r.patch('/:id(\\d+)', auth.requireAuth, fang(async (req, res) => {
+    res.json(await paperless.dokumentAendern(req.params.id, req.body || {}));
   }));
 
   // Vorschau/Original durchreichen. `art` entscheidet, was Paperless liefert.
@@ -61,13 +88,24 @@ module.exports = function createDokumenteRouter() {
   // Paperless die Datei verarbeitet hat — siehe /task/:id.
   r.post('/', auth.requireAuth, upload.single('datei'), fang(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Es kam keine Datei an.' });
+    const b = req.body || {};
+    // Über multipart kommt alles als Zeichenkette an. `tagIds` reist als
+    // kommagetrennte Liste; FEHLT das Feld, bleibt es null — dann greift der
+    // Tag aus den Einstellungen. Ein leerer String heißt dagegen „bewusst ohne
+    // Tag". Der Unterschied geht verloren, wenn man einfach split() aufruft.
+    const tagIds = b.tagIds === undefined || b.tagIds === null
+      ? null
+      : String(b.tagIds).split(',').map(x => Number(x.trim())).filter(Boolean);
     const taskId = await paperless.hochladen({
       daten: req.file.buffer,
       dateiname: req.file.originalname || 'beleg.pdf',
       mimetype: req.file.mimetype,
-      titel: (req.body && req.body.titel) || '',
-      erstellt: (req.body && req.body.erstellt) || '',
-      typId: Number((req.body && req.body.typId) || 0),
+      titel: b.titel || '',
+      erstellt: b.erstellt || '',
+      typId: Number(b.typId || 0),
+      korrespondentId: Number(b.korrespondentId || 0),
+      ablagepfadId: b.ablagepfadId === undefined ? null : Number(b.ablagepfadId || 0),
+      tagIds,
     });
     res.json({ taskId });
   }));

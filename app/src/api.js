@@ -169,6 +169,7 @@
   const angebotBeauftragen = (id, aid, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/angebot/${encodeURIComponent(aid)}/beauftragen`, { method: 'POST', body: d || {} });
   const zurueckZurAnfrage = (id) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/anfrage`, { method: 'POST' });
   const belegVerknuepfen = (id, b) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg`, { method: 'POST', body: b });
+  const belegNachtragen = (id, belegId, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg/${encodeURIComponent(belegId)}`, { method: 'PUT', body: d });
   const belegLoesen = (id, belegId) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg/${encodeURIComponent(belegId)}`, { method: 'DELETE' });
   const rechnungZuordnen = (id, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/rechnung`, { method: 'POST', body: d });
   const lagerLieferanten = () => jsonFetch('/api/bestellungen/lieferanten');
@@ -181,6 +182,12 @@
   const paperlessHealth = () => jsonFetch('/api/dokumente/health');
   const paperlessDokument = (id) => jsonFetch(`/api/dokumente/${encodeURIComponent(id)}`);
   const paperlessTask = (taskId) => jsonFetch(`/api/dokumente/task/${encodeURIComponent(taskId)}`);
+  // Tag und Korrespondent aus dem Upload-Fenster heraus anlegen. Gibt es den
+  // Namen schon, kommt der vorhandene Eintrag zurueck (`vorhanden: true`).
+  const paperlessTagAnlegen = (name) => jsonFetch('/api/dokumente/tags', { method: 'POST', body: { name } });
+  const paperlessKorrespondentAnlegen = (name) => jsonFetch('/api/dokumente/korrespondenten', { method: 'POST', body: { name } });
+  const paperlessDokumentAendern = (id, patch) => jsonFetch(`/api/dokumente/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
+  const paperlessSuche = (titel) => jsonFetch(`/api/dokumente/suche?titel=${encodeURIComponent(titel)}`);
   // Adresse der Vorschau/Datei — direkt als src oder href verwendbar. Der
   // Server holt sie mit dem Token, der Browser braucht keinen.
   const paperlessDateiUrl = (id, art = 'preview') => `/api/dokumente/${encodeURIComponent(id)}/datei?art=${encodeURIComponent(art)}`;
@@ -190,12 +197,21 @@
   //
   // Antwortet mit der Task-Kennung, NICHT mit der Dokumentnummer: Paperless
   // verarbeitet den Upload asynchron. Die Nummer trägt der Server nach.
-  async function belegHochladen(datei, { titel = '', erstellt = '', typId = 0 } = {}) {
+  async function belegHochladen(datei, {
+    titel = '', erstellt = '', typId = 0,
+    korrespondentId = 0, ablagepfadId = null, tagIds = null,
+  } = {}) {
     const fd = new FormData();
     fd.append('datei', datei, datei.name || 'beleg.pdf');
     if (titel) fd.append('titel', titel);
     if (erstellt) fd.append('erstellt', erstellt);
     if (typId) fd.append('typId', String(typId));
+    if (korrespondentId) fd.append('korrespondentId', String(korrespondentId));
+    if (ablagepfadId !== null && ablagepfadId !== undefined) fd.append('ablagepfadId', String(ablagepfadId));
+    // Nur mitschicken, wenn der Nutzer wirklich gewählt hat — sonst soll der
+    // Tag aus den Einstellungen greifen. Eine leere Liste ist eine Aussage
+    // („ohne Tag") und reist als leeres Feld mit.
+    if (Array.isArray(tagIds)) fd.append('tagIds', tagIds.join(','));
     const res = await fetch('/api/dokumente', {
       method: 'POST',
       credentials: 'same-origin',
@@ -283,10 +299,11 @@
     inventurAbschliessen, inventurUebernehmen, inventurLoeschen,
     listBestellungen, getBestellung, bestellungAnlegen, bestellungSpeichern,
     bestellungZustand, bestellungLoeschen, wareneingang, positionEingelagert,
-    belegVerknuepfen, belegLoesen, rechnungZuordnen, lagerLieferanten,
+    belegVerknuepfen, belegNachtragen, belegLoesen, rechnungZuordnen, lagerLieferanten,
     angebotAnlegen, angebotSpeichern, angebotLoeschen, angebotBeauftragen, zurueckZurAnfrage,
     paperlessConfig, putPaperlessConfig, paperlessStammlisten, paperlessTest,
     paperlessHealth, paperlessDokument, paperlessTask, paperlessDateiUrl, belegHochladen,
+    paperlessTagAnlegen, paperlessKorrespondentAnlegen, paperlessDokumentAendern, paperlessSuche,
     listAusleihen, ausleihen, rueckgabe, ausleiheLoeschen,
     listDefekte, defektMelden, defektBehoben,
     subscribe, connectWs,

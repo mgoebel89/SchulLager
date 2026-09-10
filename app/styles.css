@@ -910,3 +910,15 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
 
 /* Angebotszeile: Name und Fähnchen brauchen Luft dazwischen. */
 .angebot-kopf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Auswahl mit „+ Neu“ (Paperless-Fenster). Ans ENDE, damit die Regel nach den
+   Media-Queries steht — die erhöhen die Spezifität nicht, es entscheidet die
+   Reihenfolge. */
+.wahl-neu-kopf { display: flex; align-items: center; gap: 6px; }
+.wahl-neu-kopf select { flex: 1 1 auto; min-width: 0; }
+.wahl-neu-zeile { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+/* FALLE: `display: flex` schlaegt das eingebaute [hidden] des Browsers. Ohne
+   diese Zeile steht das Eingabefeld fuer den neuen Tag dauerhaft offen. */
+.wahl-neu-zeile[hidden] { display: none; }
+.wahl-neu-kopf .btn { white-space: nowrap; flex: 0 0 auto; }
+.wahl-neu-zeile .inp { flex: 1 1 auto; min-width: 0; }

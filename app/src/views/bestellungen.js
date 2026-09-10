@@ -349,12 +349,13 @@
           ].join('')),
           a.notiz ? el('div', { class: 'muted' }, a.notiz) : null,
         ]),
-        a.dokumentId
-          ? el('a', { class: 'btn btn-sm', href: SL.api.paperlessDateiUrl(a.dokumentId, 'preview'), target: '_blank', rel: 'noopener' }, 'Ansehen')
-          : (a.taskId
-            ? el('span', { class: 'ampel ' + (a.fehler ? 'ampel-warnung' : 'ampel-offen') },
-              a.fehler ? 'Paperless meldet einen Fehler' : 'wird verarbeitet…')
-            : el('button', { class: 'btn btn-sm', type: 'button', onclick: () => angebotPdf(b, a, fertig) }, '+ PDF')),
+        ...belegKnoepfe({
+          beleg: a,
+          fertig,
+          anhaengen: () => angebotPdf(b, a, fertig),
+          anhaengenLabel: '+ PDF',
+          zuordnen: (dokumentId) => SL.api.angebotSpeichern(b.id, a.id, { dokumentId }),
+        }),
         (!a.gewaehlt && anfrage)
           ? el('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => beauftragen(b, a, angebote, fertig) }, 'Beauftragen')
           : null,
@@ -443,19 +444,33 @@
     setTimeout(() => lieferant.focus(), 50);
   }
 
+  // Das Angebots-PDF geht über dasselbe Fenster wie Lieferschein und Rechnung:
+  // Titel, Datum, Korrespondent, Typ, Ablagepfad und Tags werden gefragt, nicht
+  // erraten. Der Lieferant des Angebots ist der Vorschlag fuer den
+  // Korrespondenten — genau danach sucht die Verwaltung später.
   async function angebotPdf(b, a, fertig) {
-    const datei = await SL.ui.pickFile('application/pdf,image/*');
-    if (!datei) return;
-    const titel = `Angebot ${a.lieferant}${a.nummer ? ' ' + a.nummer : ''}`.trim();
-    toast('Angebot wird hochgeladen…', 8000);
+    let cfg = {};
+    try { cfg = await SL.api.paperlessConfig(); } catch (_) {}
+    const ergebnis = await SL.ui.paperless.belegDialog({
+      kopf: `Angebot ablegen: ${a.lieferant || ''}`.trim(),
+      titelVorschlag: `Angebot ${a.lieferant}${a.nummer ? ' ' + a.nummer : ''}`.trim(),
+      datum: a.datum || SL.models.heuteIso(),
+      korrespondentName: a.lieferant || '',
+      typId: cfg.typAngebotId || 0,
+    });
+    if (!ergebnis) return;
     try {
-      const klein = await SL.ui.resizeImageFile(datei, { maxPx: 2000, quality: 0.85 });
-      const { taskId } = await SL.api.belegHochladen(klein, { titel, erstellt: a.datum || SL.models.heuteIso() });
-      await SL.api.angebotSpeichern(b.id, a.id, { taskId });
-      toast('Angebot in Paperless abgelegt — die Nummer trägt sich nach der Verarbeitung nach.', 4000);
+      await SL.api.angebotSpeichern(b.id, a.id, {
+        taskId: ergebnis.taskId,
+        dokumentId: ergebnis.dokumentId || null,
+      });
+      // EINE Meldung je Vorgang, und zwar die wahre.
+      toast(ergebnis.dokumentId
+        ? 'Angebot liegt in Paperless.'
+        : 'Angebot hochgeladen — Paperless verarbeitet noch, die Nummer trägt sich nach.', 4500);
       fertig();
     } catch (e) {
-      toast(e.message || 'Hochladen fehlgeschlagen.', 5000);
+      toast(e.message || 'Verknüpfen fehlgeschlagen.', 5000);
     }
   }
 
@@ -504,6 +519,47 @@
   }
 
   // --- Belege (Paperless) ---------------------------------------------------
+  //
+  // Die Knöpfe an einer Belegzeile — für Angebote, Lieferscheine und
+  // Rechnungen dieselben.
+  //
+  // „wird verarbeitet…" war vorher eine Sackgasse: ein Beleg, dessen
+  // Vorgangsnummer Paperless nicht mehr kennt, blieb für immer so stehen und
+  // niemand konnte etwas tun. Jetzt steht daneben „Nachschauen" — das fragt
+  // erst den Vorgang ab und sucht dann über den Titel nach dem Dokument.
+  function belegKnoepfe({ beleg, fertig, zuordnen, anhaengen = null, anhaengenLabel = '+ Datei' }) {
+    if (beleg.dokumentId) {
+      return [
+        el('a', {
+          class: 'btn btn-sm', href: SL.api.paperlessDateiUrl(beleg.dokumentId, 'preview'),
+          target: '_blank', rel: 'noopener',
+        }, 'Ansehen'),
+        el('button', {
+          class: 'btn btn-sm', type: 'button',
+          title: 'Titel, Tags und Korrespondent in Paperless ändern',
+          onclick: () => SL.ui.paperless.belegAendernDialog(beleg.dokumentId, fertig),
+        }, 'Angaben'),
+      ];
+    }
+    if (!beleg.taskId) {
+      return anhaengen
+        ? [el('button', { class: 'btn btn-sm', type: 'button', onclick: anhaengen }, anhaengenLabel)]
+        : [];
+    }
+    return [
+      el('span', { class: 'ampel ' + (beleg.fehler ? 'ampel-warnung' : 'ampel-offen') },
+        beleg.fehler ? 'Paperless meldet einen Fehler' : 'wird verarbeitet…'),
+      el('button', {
+        class: 'btn btn-sm', type: 'button',
+        title: 'In Paperless nachsehen, ob der Beleg inzwischen angekommen ist',
+        onclick: () => SL.ui.paperless.nachschauen(beleg, async (dokumentId) => {
+          await zuordnen(dokumentId);
+          fertig();
+        }),
+      }, 'Nachschauen'),
+    ];
+  }
+
   async function belegKarte(b, fertig) {
     let eingerichtet = false;
     try { eingerichtet = (await SL.api.paperlessHealth()).eingerichtet; } catch (_) {}
@@ -523,12 +579,11 @@
           el('strong', {}, titel),
           el('span', { class: 'muted' }, ` · ${beleg.art} · ${formatDatum(String(beleg.hochgeladenAm).slice(0, 10))}`),
         ]),
-        // Schwebend heißt: Paperless verarbeitet noch (OCR). Kein Fehler —
-        // aber es muss dranstehen, sonst hält man den Beleg für verloren.
-        beleg.dokumentId
-          ? el('a', { class: 'btn btn-sm', href: SL.api.paperlessDateiUrl(beleg.dokumentId, 'preview'), target: '_blank', rel: 'noopener' }, 'Ansehen')
-          : el('span', { class: 'ampel ' + (beleg.fehler ? 'ampel-warnung' : 'ampel-offen') },
-            beleg.fehler ? 'Paperless meldet einen Fehler' : 'wird verarbeitet…'),
+        ...belegKnoepfe({
+          beleg,
+          fertig,
+          zuordnen: (dokumentId) => SL.api.belegNachtragen(b.id, beleg.id, { dokumentId }),
+        }),
         el('button', {
           class: 'btn btn-sm link-danger', type: 'button',
           title: 'Nur die Verknüpfung lösen — das Dokument bleibt in Paperless.',
@@ -553,28 +608,33 @@
   }
 
   async function belegHochladen(b, art, fertig) {
-    // Am Lieferschein steht man mit dem Handy vor dem Karton → Kamera.
-    // Die Rechnung ist eine Datei auf dem Rechner → Dateiauswahl.
-    const datei = art === 'lieferschein'
-      ? await SL.ui.pickFile('image/*,application/pdf', 'environment')
-      : await SL.ui.pickFile('application/pdf,image/*');
-    if (!datei) return;
-
-    const titel = `${art === 'rechnung' ? 'Rechnung' : 'Lieferschein'} ${b.lieferant || ''}`.trim()
-      + (b.belegnummer ? ` (${b.belegnummer})` : '');
-    toast('Beleg wird hochgeladen…', 8000);
+    const rechnung = art === 'rechnung';
+    let cfg = {};
+    try { cfg = await SL.api.paperlessConfig(); } catch (_) {}
+    const ergebnis = await SL.ui.paperless.belegDialog({
+      kopf: rechnung ? 'Rechnung ablegen' : 'Lieferschein ablegen',
+      titelVorschlag: `${rechnung ? 'Rechnung' : 'Lieferschein'} ${b.lieferant || ''}`.trim()
+        + (b.belegnummer ? ` (${b.belegnummer})` : ''),
+      datum: SL.models.heuteIso(),
+      korrespondentName: b.lieferant || '',
+      typId: (rechnung ? cfg.typRechnungId : cfg.typLieferscheinId) || 0,
+      // Am Lieferschein steht man mit dem Handy vor dem Karton → Kamera.
+      // Die Rechnung ist eine Datei auf dem Rechner → Dateiauswahl.
+      dateiWahl: rechnung ? 'application/pdf,image/*' : 'image/*,application/pdf',
+      kamera: !rechnung,
+    });
+    if (!ergebnis) return;
     try {
-      // Fotos verkleinern; PDFs bleiben unangetastet (resizeImageFile gibt sie
-      // unverändert zurück).
-      const klein = await SL.ui.resizeImageFile(datei, { maxPx: 2000, quality: 0.85 });
-      const { taskId } = await SL.api.belegHochladen(klein, { titel, erstellt: SL.models.heuteIso() });
-      await SL.api.belegVerknuepfen(b.id, { art, taskId, titel });
-      // EINE Meldung je Vorgang, und zwar die wahre: der Upload ist da, aber
-      // die Dokumentnummer entsteht erst nach der Verarbeitung in Paperless.
-      toast('Beleg in Paperless abgelegt — die Nummer trägt sich nach der Verarbeitung nach.', 4000);
+      await SL.api.belegVerknuepfen(b.id, {
+        art, taskId: ergebnis.taskId, dokumentId: ergebnis.dokumentId || null, titel: ergebnis.titel,
+      });
+      // EINE Meldung je Vorgang, und zwar die wahre.
+      toast(ergebnis.dokumentId
+        ? 'Beleg liegt in Paperless.'
+        : 'Beleg hochgeladen — Paperless verarbeitet noch, die Nummer trägt sich nach.', 4500);
       fertig();
     } catch (e) {
-      toast(e.message || 'Hochladen fehlgeschlagen.', 5000);
+      toast(e.message || 'Verknüpfen fehlgeschlagen.', 5000);
     }
   }
 
