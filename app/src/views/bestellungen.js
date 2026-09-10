@@ -37,12 +37,30 @@
     // Positionen; fehlen sie, wird die Rohsumme untergeschoben.
     const quelle = (b.positionen && b.positionen.length)
       ? b
-      : { preisArt: b.preisArt, positionen: [{ menge: 1, preis: b.summe || 0 }] };
+      : {
+        preisArt: b.preisArt, nachlassArt: b.nachlassArt, nachlassWert: b.nachlassWert,
+        positionen: [{ menge: 1, preis: b.summe || 0 }],
+      };
     const s = SL.models.summen(quelle, SL.store.state.settings);
-    if (!s.erfasst) return '';
-    return s.art === 'brutto'
+    if (!s.erfasst && !s.roh) return '';
+    const kern = s.art === 'brutto'
       ? `${euro(s.brutto)} brutto (${euro(s.netto)} netto)`
       : `${euro(s.netto)} netto (${euro(s.brutto)} brutto)`;
+    // Der Nachlass gehoert an JEDE Summe: ohne ihn passt die Zahl nicht zu den
+    // Positionen darueber, und man sucht den Rechenfehler.
+    return s.nachlass > 0 ? `${kern} — nach ${euro(s.nachlass)} Nachlass` : kern;
+  }
+
+  // Der Nachlass in Worten. Prozent UND Betrag, weil im Angebot das eine steht
+  // und auf der Rechnung das andere.
+  function nachlassText(b) {
+    const s = SL.models.summen(b.positionen && b.positionen.length ? b
+      : { preisArt: b.preisArt, nachlassArt: b.nachlassArt, nachlassWert: b.nachlassWert, positionen: [{ menge: 1, preis: b.summe || 0 }] },
+      SL.store.state.settings);
+    const teile = [euro(s.nachlass)];
+    if (b.nachlassArt === 'prozent') teile.push(`(${SL.ui.formatZahl(Number(b.nachlassWert) || 0, 2)} %)`);
+    if (b.nachlassText) teile.push(`· ${b.nachlassText}`);
+    return teile.join(' ');
   }
 
   // Angebotsbeträge zum Vergleich auf brutto bringen — ein Angebot kann netto
@@ -184,6 +202,9 @@
       b.belegnummer ? zeile('Bestellnummer', b.belegnummer) : null,
       zeile('Positionen', String((b.positionen || []).length)),
       zeile('Summe (bestellt)', summeText(b)),
+      (Number(b.nachlassWert) || 0) > 0
+        ? zeile('Nachlass', nachlassText(b))
+        : null,
       b.vergabeBegruendung ? zeile('Begründung der Vergabe', b.vergabeBegruendung) : null,
       b.rechnung ? zeile('Rechnung', `${b.rechnung.nummer || '(ohne Nummer)'} vom ${formatDatum(b.rechnung.datum)}${b.rechnung.betrag != null ? ' · ' + euro(b.rechnung.betrag) : ''}`) : null,
       b.notiz ? zeile('Bemerkung', b.notiz) : null,
@@ -402,6 +423,71 @@
     const datum = input({ type: 'date', value: a ? a.datum : SL.models.heuteIso() });
     const notiz = input({ value: a ? a.notiz : '', placeholder: 'Lieferzeit, Besonderheiten …' });
 
+    // --- Positionspreise (freiwillig) ---
+    // Der Endbetrag oben fuehrt: er ist die Zahl aus dem Angebot und
+    // entscheidet ueber Vergleich und Vergabegrenze. Die Einzelpreise sind
+    // dafuer da, beim Beauftragen in die Bestellung zu wandern — ein
+    // dreiseitiges Angebot muss niemand abtippen, nur um vergleichen zu koennen.
+    const preise = { ...((a && a.preise) || {}) };
+    const preisBox = el('div');
+    const abgleich = el('p', { class: 'muted' });
+
+    function positionenSumme() {
+      return (b.positionen || []).reduce((sum, p) => {
+        const v = preise[p.id];
+        return sum + (v == null || v === '' ? 0 : Number(v) * (p.menge || 0));
+      }, 0);
+    }
+
+    function abgleichZeigen() {
+      const gesetzt = (b.positionen || []).some(p => preise[p.id] != null && preise[p.id] !== '');
+      const ende = betrag.value === '' ? null : Number(betrag.value);
+      if (!gesetzt || ende == null) { abgleich.textContent = ''; abgleich.className = 'muted'; return; }
+      const roh = positionenSumme();
+      const diff = roh - ende;
+      if (diff > 0.005) {
+        // Genau das ist der Rabatt. Beim Beauftragen wird er als Nachlass in
+        // die Bestellung geschrieben.
+        abgleich.className = 'ampel ampel-ok';
+        abgleich.textContent = `Positionen ${euro(roh)} · Endbetrag ${euro(ende)} — die Differenz von `
+          + `${euro(diff)} wird beim Beauftragen als Rabatt übernommen.`;
+      } else if (diff < -0.005) {
+        abgleich.className = 'ampel ampel-warnung';
+        abgleich.textContent = `Der Endbetrag liegt um ${euro(-diff)} ÜBER der Summe der Positionen. `
+          + 'Fracht oder Zuschlag? Das gehört als eigene Position erfasst — ein Rabatt wird daraus nicht.';
+      } else {
+        abgleich.className = 'muted';
+        abgleich.textContent = `Positionen und Endbetrag stimmen überein (${euro(roh)}) — kein Rabatt.`;
+      }
+    }
+
+    function preiseZeichnen() {
+      preisBox.innerHTML = '';
+      if (!(b.positionen || []).length) { preisBox.appendChild(leer('Der Vorgang hat noch keine Positionen.')); return; }
+      for (const p of b.positionen) {
+        const f = input({
+          type: 'number', min: '0', step: '0.01', placeholder: '€ je Stück',
+          value: preise[p.id] != null ? String(preise[p.id]) : '',
+        });
+        f.style.maxWidth = '7rem';
+        f.addEventListener('input', () => {
+          if (f.value === '') delete preise[p.id]; else preise[p.id] = Number(f.value);
+          abgleichZeigen();
+        });
+        preisBox.appendChild(el('div', { class: 'doc-zeile' }, [
+          el('span', { class: 'doc-titel' }, [
+            el('div', {}, p.artikelName || '(ohne Bezeichnung)'),
+            el('div', { class: 'muted' }, `${p.menge} ×`),
+          ]),
+          f,
+        ]));
+      }
+    }
+    preiseZeichnen();
+    betrag.addEventListener('input', () => abgleichZeigen());
+    art.addEventListener('change', () => abgleichZeigen());
+    abgleichZeigen();
+
     const dlg = modal(istNeu ? 'Angebot erfassen' : 'Angebot ändern', [
       el('div', { class: 'form-grid' }, [
         feld('Lieferant', el('span', {}, [lieferant, liste])),
@@ -413,6 +499,11 @@
       feld('Bemerkung', notiz, { breit: true }),
       el('p', { class: 'muted' }, 'Netto oder brutto trägt jedes Angebot für sich — der eine Lieferant weist es so aus, '
         + 'der andere anders. Für den Vergleich rechnet die App alles auf brutto.'),
+      el('h3', { class: 'abschnitt' }, 'Einzelpreise (freiwillig)'),
+      el('p', { class: 'muted' }, 'Der Endbetrag oben ist maßgeblich. Wer die Einzelpreise einträgt, bekommt sie '
+        + 'beim Beauftragen in die Bestellung übernommen — und die Differenz zum Endbetrag als Rabatt.'),
+      preisBox,
+      abgleich,
       istNeu ? el('p', { class: 'muted' }, 'Das Angebots-PDF hängst du gleich danach an; es geht nach Paperless.') : null,
     ], {
       fuss: [
@@ -429,6 +520,7 @@
               nummer: nummer.value.trim(),
               datum: datum.value,
               notiz: notiz.value.trim(),
+              preise,
             };
             try {
               if (istNeu) await SL.api.angebotAnlegen(b.id, koerper);
@@ -490,8 +582,24 @@
     });
     if (b.vergabeBegruendung) begruendung.value = b.vergabeBegruendung;
 
+    // Was beim Beauftragen mit den Preisen passiert, muss VORHER dastehen —
+    // hinterher steht in der Bestellung eine Zahl, die niemand erwartet hat.
+    const preise = (a.preise) || {};
+    const mitPreisen = (b.positionen || []).filter(p => preise[p.id] != null);
+    const rohAusAngebot = mitPreisen.reduce((s2, p) => s2 + Number(preise[p.id]) * (p.menge || 0), 0);
+    const rabatt = (mitPreisen.length && a.betrag != null) ? rohAusAngebot - a.betrag : 0;
+
     const dlg = modal(`Beauftragen: ${a.lieferant}`, [
       el('p', {}, 'Damit wird aus der Anfrage eine Bestellung. Lieferant und Bestelldatum kommen aus diesem Angebot.'),
+      mitPreisen.length
+        ? el('p', { class: 'muted' }, `${mitPreisen.length} Positionspreis(e) aus dem Angebot werden übernommen; `
+          + `die Bestellung rechnet danach ${a.preisArt}.`)
+        : el('p', { class: 'muted' }, 'Dieses Angebot trägt keine Einzelpreise — die Positionen der Bestellung '
+          + 'bleiben ohne Preis, bis du sie einträgst.'),
+      rabatt > 0.005
+        ? el('p', { class: 'ampel ampel-ok' }, `Die Differenz von ${euro(rabatt)} zwischen den Einzelpreisen `
+          + `(${euro(rohAusAngebot)}) und dem Endbetrag (${euro(a.betrag)}) wird als Rabatt in die Bestellung geschrieben.`)
+        : null,
       teurer
         ? el('p', { class: 'ampel ampel-warnung' },
           `Dieses Angebot ist um ${euro(dieses - guenstigstes)} brutto teurer als das günstigste. Bitte kurz begründen.`)
@@ -646,6 +754,9 @@
       bestelltAm: b ? String(b.bestelltAm || '').slice(0, 10) : SL.models.heuteIso(),
       belegnummer: b ? b.belegnummer : '',
       notiz: b ? b.notiz : '',
+      nachlassArt: b ? (b.nachlassArt || 'betrag') : 'betrag',
+      nachlassWert: b ? (Number(b.nachlassWert) || 0) : 0,
+      nachlassText: b ? (b.nachlassText || '') : '',
       positionen: b ? (b.positionen || []).map(p => ({ ...p })) : [],
     };
 
@@ -666,6 +777,26 @@
     const summe = el('p', { class: 'muted' });
     let alsAnfrage = false;
 
+    // Der Entwurf ist eine Anfrage, solange kein Bestelldatum darinsteht — das
+    // gilt beim Anlegen wie beim Bearbeiten. Nicht der gespeicherte Zustand
+    // entscheidet, sondern das Feld: wer hier ein Bestelldatum eintraegt, macht
+    // aus der Anfrage gerade eine Bestellung und will die Preisspalte sofort.
+    const anfrageEntwurf = () => !datumFeld.value;
+
+    // Nachlass auf den ganzen Vorgang: Kommissionsrabatte lassen sich nicht auf
+    // Positionen aufteilen, und der Positionspreis soll der Listenpreis bleiben
+    // (er geht als Kaufpreis an den Homebox-Artikel).
+    const nachlassArt = SL.ui.select(
+      [{ wert: 'betrag', label: '€' }, { wert: 'prozent', label: '%' }],
+      daten.nachlassArt || 'betrag', () => summeZeigen(), { leerLabel: false });
+    const nachlassWert = input({
+      type: 'number', min: '0', step: '0.01',
+      value: (Number(daten.nachlassWert) || 0) ? String(daten.nachlassWert) : '',
+      placeholder: '0',
+    });
+    nachlassWert.addEventListener('input', () => summeZeigen());
+    const nachlassText = input({ value: daten.nachlassText || '', placeholder: 'z. B. Kommissionsrabatt' });
+
     function posZeichnen() {
       posBox.innerHTML = '';
       if (!daten.positionen.length) posBox.appendChild(leer('Noch keine Position.'));
@@ -673,6 +804,10 @@
         const menge = input({ type: 'number', min: '0', step: '1', value: String(p.menge || 1), class: 'inp zaehl-feld' });
         const preis = input({ type: 'number', min: '0', step: '0.01', value: p.preis != null ? String(p.preis) : '', placeholder: '€', class: 'inp' });
         preis.style.maxWidth = '7rem';
+        // Bei einer ANFRAGE gibt es noch keinen Preis — man fragt ihn ja gerade
+        // erst an. Ein leeres Feld daneben sieht aus wie eine vergessene
+        // Eingabe; die Preise kommen spaeter aus dem beauftragten Angebot.
+        preis.hidden = anfrageEntwurf();
         menge.addEventListener('input', () => { p.menge = Math.max(0, Number(menge.value) || 0); summeZeigen(); });
         preis.addEventListener('input', () => { p.preis = preis.value === '' ? null : Number(preis.value); summeZeigen(); });
         posBox.appendChild(el('div', { class: 'doc-zeile' }, [
@@ -700,12 +835,27 @@
       summeZeigen();
     }
     function summeZeigen() {
-      const entwurf = { preisArt: artFeld.value, positionen: daten.positionen };
+      const entwurf = {
+        preisArt: artFeld.value,
+        positionen: daten.positionen,
+        nachlassArt: nachlassArt.value,
+        nachlassWert: nachlassWert.value,
+        // Die vorhandenen Angebote entscheiden bei einer Anfrage ueber die
+        // Schwelle — ohne sie waere der Hinweis blind.
+        angebote: (b && b.angebote) || [],
+      };
       const w = SL.models.summen(entwurf, SL.store.state.settings);
-      if (!w.erfasst) { summe.textContent = ''; summe.className = 'muted'; return; }
       const pflicht = SL.models.angebotspflicht(entwurf, SL.store.state.settings);
-      summe.textContent = `Summe: ${euro(w.netto)} netto · ${euro(w.brutto)} brutto`
-        + (pflicht.pflichtig ? ` — ab ${euro(pflicht.schwelle)} brutto sind ${pflicht.noetig} Angebote nötig.` : '');
+      if (!w.roh && !pflicht.pflichtig) { summe.textContent = ''; summe.className = 'muted'; return; }
+      const teile = [];
+      if (w.roh) {
+        if (w.nachlass > 0) teile.push(`Positionen: ${euro(w.roh)} · Nachlass: ${euro(w.nachlass)}`);
+        teile.push(`Summe: ${euro(w.netto)} netto · ${euro(w.brutto)} brutto`);
+      }
+      if (pflicht.pflichtig) {
+        teile.push(`Ab ${euro(pflicht.schwelle)} brutto sind ${pflicht.noetig} Angebote nötig.`);
+      }
+      summe.textContent = teile.join(' — ');
       summe.className = pflicht.pflichtig ? 'ampel ampel-bald' : 'muted';
     }
 
@@ -719,6 +869,13 @@
       feld('Bemerkung', notizFeld, { breit: true }),
       el('h3', { class: 'abschnitt' }, 'Positionen'),
       posBox,
+      el('div', { class: 'form-grid' }, [
+        feld('Nachlass', el('div', { class: 'wahl-neu-kopf' }, [nachlassWert, nachlassArt])),
+        feld('Grund des Nachlasses', nachlassText),
+      ]),
+      el('p', { class: 'muted' }, 'Ein Kommissions- oder Sonderrabatt gilt für den ganzen Vorgang und lässt sich '
+        + 'nicht auf einzelne Positionen aufteilen. Die Positionspreise bleiben deshalb Listenpreise — sie gehen '
+        + 'als Kaufpreis an den Artikel im Lager.'),
       summe,
       el('div', { class: 'btn-reihe' }, [
         el('button', { class: 'btn', type: 'button', onclick: () => ausBestand() }, '+ Aus dem Bestand'),
@@ -746,6 +903,9 @@
     });
 
     posZeichnen();
+    // Ein gesetztes Bestelldatum macht aus dem Entwurf eine Bestellung — dann
+    // gehoert die Preisspalte wieder hin.
+    datumFeld.addEventListener('change', () => posZeichnen());
     // Vorschläge sind Komfort — scheitern sie, geht das Formular trotzdem.
     SL.api.lagerLieferanten().then(liste => {
       for (const l of liste.slice(0, 40)) datenListe.appendChild(el('option', { value: l.name }));
@@ -854,6 +1014,9 @@
         belegnummer: nummerFeld.value.trim(),
         notiz: notizFeld.value.trim(),
         preisArt: artFeld.value,
+        nachlassArt: nachlassArt.value,
+        nachlassWert: nachlassWert.value === '' ? 0 : Number(nachlassWert.value),
+        nachlassText: nachlassText.value.trim(),
         positionen: daten.positionen,
       };
       // Eine ANFRAGE hat noch keinen Lieferanten — der kommt aus dem Angebot,

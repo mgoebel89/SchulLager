@@ -53,6 +53,18 @@
       const mitPreis = positionen.filter(p => p.preis != null);
       ctx.abstand(2);
       if (mitPreis.length) {
+        // Der Nachlass gehoert VOR die Summe: sonst passt die Summe nicht zu
+        // den Positionen darueber, und die Verwaltung rechnet nach.
+        if (w.nachlass > 0) {
+          ctx.text(`Summe der Positionen: ${SL.ui.formatZahl(w.roh, 2)} €`, { size: 10 });
+          const wie = b.nachlassArt === 'prozent' ? ` (${SL.ui.formatZahl(Number(b.nachlassWert) || 0, 2)} %)` : '';
+          // FALLE: das echte Minuszeichen (U+2212) steht NICHT in WinAnsi, das
+          // die Standardschrift von jsPDF benutzt. Es wird zum Sternchen, und
+          // die ganze Zeile kippt in Sperrschrift. Hier gehoert der
+          // gewoehnliche Bindestrich hin.
+          ctx.text(`Nachlass${wie}${b.nachlassText ? ' - ' + b.nachlassText : ''}: -${SL.ui.formatZahl(w.nachlass, 2)} €`,
+            { size: 10 });
+        }
         ctx.text(`Summe: ${SL.ui.formatZahl(w.netto, 2)} € netto · ${SL.ui.formatZahl(w.brutto, 2)} € brutto`,
           { size: 11, stil: 'bold' });
         if (mitPreis.length < positionen.length) {

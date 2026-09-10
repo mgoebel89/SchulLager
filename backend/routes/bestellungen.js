@@ -65,6 +65,31 @@ function normPosition(p, alt = null) {
   };
 }
 
+// Positionspreise eines Angebots. Leere Eintraege fallen raus, damit
+// "kein Preis angegeben" und "0 Euro" unterscheidbar bleiben.
+function normPreise(roh) {
+  const out = {};
+  for (const [k, v] of Object.entries(roh || {})) {
+    const n = zahl(v);
+    if (n !== null && !Number.isNaN(n)) out[text(k)] = n;
+  }
+  return out;
+}
+
+// Der Nachlass auf den ganzen Vorgang: Kommissions- und Sonderrabatte lassen
+// sich nicht auf einzelne Positionen aufteilen, und der Positionspreis soll
+// der Listenpreis bleiben -- er geht als Kaufpreis an den Homebox-Artikel.
+// Deshalb eine eigene Zeile unter der Summe statt einer Umlage.
+function normNachlass(b, roh) {
+  if (!roh) return;
+  if (roh.nachlassArt !== undefined) b.nachlassArt = roh.nachlassArt === 'prozent' ? 'prozent' : 'betrag';
+  if (roh.nachlassWert !== undefined) {
+    const n = zahl(roh.nachlassWert);
+    b.nachlassWert = n === null || Number.isNaN(n) ? 0 : Math.max(0, n);
+  }
+  if (roh.nachlassText !== undefined) b.nachlassText = text(roh.nachlassText);
+}
+
 function normAngebot(a, alt = null) {
   return {
     id: text(a.id) || (alt && alt.id) || crypto.randomUUID(),
@@ -77,6 +102,11 @@ function normAngebot(a, alt = null) {
     datum: a.datum !== undefined ? text(a.datum) : (alt ? alt.datum : ''),
     nummer: a.nummer !== undefined ? text(a.nummer) : (alt ? alt.nummer : ''),
     notiz: a.notiz !== undefined ? text(a.notiz) : (alt ? alt.notiz : ''),
+    // Preise JE POSITION der Anfrage: { positionId: preis }. Freiwillig -- der
+    // Endbetrag oben fuehrt (so mit Matthias entschieden), die Einzelpreise
+    // sind dafuer da, beim Beauftragen in die Bestellung zu wandern. Ein
+    // dreiseitiges Angebot muss niemand abtippen, nur um vergleichen zu koennen.
+    preise: a.preise !== undefined ? normPreise(a.preise) : (alt ? alt.preise : {}),
     // Das Angebots-PDF liegt in Paperless, wie Lieferschein und Rechnung.
     taskId: a.taskId !== undefined ? text(a.taskId) : (alt ? alt.taskId : ''),
     dokumentId: a.dokumentId !== undefined ? (a.dokumentId ? Number(a.dokumentId) : null) : (alt ? alt.dokumentId : null),
@@ -112,6 +142,10 @@ function anreichern(b) {
     // auftauchen. Die Umrechnung macht die Oberfläche (SL.models.summen), damit
     // der MwSt-Satz aus den Einstellungen nur an EINER Stelle angewandt wird.
     summe: pos.reduce((s, p) => s + (p.preis != null ? p.preis * p.menge : 0), 0),
+    // Vorbelegung fuer aeltere Vorgaenge, die die Felder noch nicht haben.
+    nachlassArt: b.nachlassArt === 'prozent' ? 'prozent' : 'betrag',
+    nachlassWert: Number(b.nachlassWert) || 0,
+    nachlassText: b.nachlassText || '',
     anzahlAngebote: (b.angebote || []).length,
     offenePositionen: pos.filter(p => (p.geliefert || 0) < p.menge).length,
     einzulagern: pos.filter(p => (p.geliefert || 0) > 0 && !p.eingelagert).length,
@@ -200,6 +234,10 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
       bestelltAm: alsAnfrage ? '' : (text(bestelltAm) || heuteIso()),
       angefragtAm: nowIso(),
       preisArt: preisArt === 'brutto' ? 'brutto' : 'netto',
+      // Nachlass auf den ganzen Vorgang (Kommissionsrabatt). 0 heisst: keiner.
+      nachlassArt: 'betrag',
+      nachlassWert: 0,
+      nachlassText: '',
       angebote: [],
       belegnummer: text(belegnummer),
       notiz: text(notiz),
@@ -227,6 +265,7 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
     if (req.body && req.body.preisArt !== undefined) {
       b.preisArt = req.body.preisArt === 'brutto' ? 'brutto' : 'netto';
     }
+    normNachlass(b, req.body);
     if (belegnummer !== undefined) b.belegnummer = text(belegnummer);
     if (notiz !== undefined) b.notiz = text(notiz);
 
@@ -418,6 +457,40 @@ module.exports = function createBestellungenRouter(broadcast, homebox, paperless
     for (const x of b.angebote) x.gewaehlt = (x.id === a.id);
     b.lieferant = a.lieferant || b.lieferant;
     b.bestelltAm = text((req.body || {}).bestelltAm) || heuteIso();
+
+    // Die Bestellung wird zu DEN BEDINGUNGEN dieses Angebots erteilt. Deshalb
+    // uebernimmt sie auch dessen Netto/Brutto-Angabe: sonst muesste jeder
+    // uebernommene Positionspreis umgerechnet werden, und eine umgerechnete
+    // Zahl steht in keinem Angebot -- man koennte sie spaeter nicht wiederfinden.
+    const preise = a.preise || {};
+    if (Object.keys(preise).length) {
+      b.preisArt = a.preisArt === 'brutto' ? 'brutto' : 'netto';
+      for (const p of b.positionen || []) {
+        if (preise[p.id] !== undefined) p.preis = preise[p.id];
+      }
+    }
+
+    // Die Differenz zwischen der Summe der Positionen und dem Endbetrag des
+    // Angebots IST der Rabatt (so mit Matthias entschieden). Ohne diese Zeile
+    // stuende in der Bestellung die Summe der Listenpreise und niemand wuesste
+    // mehr, warum die Rechnung niedriger ausfaellt.
+    if (Object.keys(preise).length && a.betrag != null) {
+      // Gerechnet wird ueber GENAU die Positionen, die das Angebot bepreist --
+      // dieselbe Zahl, die der Beauftragen-Dialog vorher angezeigt hat. Wuerde
+      // hier ueber alle Positionen summiert, koennte ein alter Preis aus einer
+      // frueheren Fassung den Rabatt verfaelschen.
+      const roh = (b.positionen || [])
+        .filter(p => preise[p.id] !== undefined)
+        .reduce((sum, p) => sum + preise[p.id] * p.menge, 0);
+      const diff = roh - a.betrag;
+      // Nur ein echter Nachlass. Liegt der Endbetrag hoeher (Fracht, Zuschlag),
+      // wird nichts erfunden -- das gehoert als eigene Position erfasst.
+      if (diff > 0.005) {
+        b.nachlassArt = 'betrag';
+        b.nachlassWert = Math.round(diff * 100) / 100;
+        if (!b.nachlassText) b.nachlassText = `Rabatt laut Angebot${a.nummer ? ' ' + a.nummer : ''}`;
+      }
+    }
     b.beauftragtAm = nowIso();
     b.beauftragtVon = req.benutzer.name;
     // Die Begründung ist Pflicht, sobald NICHT das günstigste Angebot gewählt

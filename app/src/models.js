@@ -175,24 +175,61 @@
   // DESHALB GILT: eine Summe wird in dieser App NIE ohne das Wort „netto" oder
   // „brutto" angezeigt. Eine nackte Zahl wäre hier mehrdeutig, und genau an
   // dieser Mehrdeutigkeit hängt die Angebotspflicht.
+  // NACHLASS: Kommissions- und Sonderrabatte lassen sich nicht auf einzelne
+  // Positionen aufteilen. Sie stehen deshalb als eigene Zeile am Vorgang, und
+  // die Positionspreise bleiben Listenpreise — die gehen als Kaufpreis an den
+  // Homebox-Artikel und muessen dem Angebot entsprechen.
+  //
+  // `roh` ist die Summe der Positionen, `erfasst` das, was zu zahlen ist. Auf
+  // `erfasst` rechnet die Mehrwertsteuer, und an `brutto` haengt die
+  // Angebotspflicht.
+  function nachlassBetrag(bestellung, roh) {
+    const wert = Number(bestellung && bestellung.nachlassWert) || 0;
+    if (wert <= 0) return 0;
+    const betrag = (bestellung.nachlassArt === 'prozent') ? roh * wert / 100 : wert;
+    // Mehr Nachlass als Warenwert waere ein Tippfehler, kein Geschenk.
+    return Math.min(Math.max(betrag, 0), roh);
+  }
+
   function summen(bestellung, settings) {
     const s = settings || {};
     const satz = Number(s.mwstSatz != null ? s.mwstSatz : 19) || 0;
     const art = bestellung && bestellung.preisArt === 'brutto' ? 'brutto' : 'netto';
     const roh = (bestellung && bestellung.positionen || [])
       .reduce((acc, p) => acc + (p.preis != null ? p.preis * p.menge : 0), 0);
-    return art === 'brutto'
-      ? { art, netto: roh / (1 + satz / 100), brutto: roh, erfasst: roh, satz }
-      : { art, netto: roh, brutto: roh * (1 + satz / 100), erfasst: roh, satz };
+    const nachlass = nachlassBetrag(bestellung, roh);
+    const erfasst = roh - nachlass;
+    const w = art === 'brutto'
+      ? { art, netto: erfasst / (1 + satz / 100), brutto: erfasst, satz }
+      : { art, netto: erfasst, brutto: erfasst * (1 + satz / 100), satz };
+    return { ...w, erfasst, roh, nachlass };
   }
 
   // Verlangt die Schule für diesen Vorgang mehrere Angebote? Gerechnet wird
   // immer am BRUTTO-Wert — so steht es in der Vorgabe.
+  // Womit gerechnet wird, wenn der Vorgang noch eine ANFRAGE ist und keine
+  // Preise trägt: mit dem hoechsten vorliegenden Angebot. Die Pflicht wird
+  // dadurch sichtbar, sobald das erste Angebot einen Betrag hat (so mit
+  // Matthias entschieden) — und im Zweifel eher gewarnt als geschwiegen. Ein
+  // ueberfluessiger Hinweis kostet nichts, eine versaeumte Vergabepflicht schon.
+  function angebotswert(bestellung, settings) {
+    const satz = Number((settings || {}).mwstSatz != null ? settings.mwstSatz : 19) || 0;
+    let hoechster = 0;
+    for (const a of (bestellung && bestellung.angebote) || []) {
+      if (a.betrag == null) continue;
+      const brutto = a.preisArt === 'brutto' ? a.betrag : a.betrag * (1 + satz / 100);
+      if (brutto > hoechster) hoechster = brutto;
+    }
+    return hoechster;
+  }
+
   function angebotspflicht(bestellung, settings) {
     const s = settings || {};
     const schwelle = Number(s.angebotSchwelle) || 0;
     const noetig = Number(s.angebotAnzahl) || 0;
-    const brutto = summen(bestellung, s).brutto;
+    const eigene = summen(bestellung, s).brutto;
+    const ausAngeboten = angebotswert(bestellung, s);
+    const brutto = Math.max(eigene, ausAngeboten);
     const vorhanden = ((bestellung && bestellung.angebote) || []).length;
     const pflichtig = schwelle > 0 && brutto >= schwelle;
     return {
@@ -268,6 +305,6 @@
     codeArt,
     LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
     istDemonstrator, geraeteArt, istGeraet, GERAET_LABEL,
-    summen, angebotspflicht, istAnfrage,
+    summen, nachlassBetrag, angebotswert, angebotspflicht, istAnfrage,
   };
 })();
