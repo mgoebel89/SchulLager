@@ -5,7 +5,13 @@
 
   const { el, karte, toast } = SL.ui;
 
-  // Komponenten aus einer CSV-Datei übernehmen.
+  // Netzwerkgeräte aus einer CSV-Datei übernehmen.
+  //
+  // Eine Zeile = ein Gerät = ein Artikel im Lager plus seine Netzangaben.
+  // Verknüpft wird mit einem vorhandenen Artikel NUR, wenn die Zeile das in
+  // der Spalte „VorhandenerArtikel" ausdrücklich sagt — ein zufällig
+  // gleichnamiger Artikel bekäme sonst still die Netzangaben eines anderen
+  // Geräts.
   //
   // Der Weg ist bewusst dreistufig: Vorlage holen → Datei wählen → VORSCHAU →
   // importieren. Ohne Vorschau erfährt man von einer falsch zugeordneten Spalte
@@ -76,11 +82,15 @@
       return;
     }
 
-    mount.appendChild(el('div', { class: 'toolbar' }, [el('h1', {}, 'Komponenten importieren')]));
+    mount.appendChild(el('div', { class: 'toolbar' }, [
+      el('h1', {}, 'Netzwerkgeräte importieren'),
+      el('span', { class: 'spacer' }),
+      el('a', { class: 'btn', href: '#/netzwerk' }, '‹ Netzwerk'),
+    ]));
 
     let spalten = [];
     try {
-      spalten = await SL.api.komponentenSpalten();
+      spalten = await SL.api.netzSpalten();
     } catch (e) {
       mount.appendChild(karte('Das hat nicht geklappt', el('p', { class: 'anmeldung-fehler' }, e.message || '')));
       return;
@@ -106,8 +116,8 @@
           class: 'btn btn-primary', type: 'button',
           onclick: async () => {
             try {
-              const csv = await SL.api.komponentenVorlage();
-              SL.ui.downloadFile('komponenten-vorlage.csv', csv, 'text/csv;charset=utf-8');
+              const csv = await SL.api.netzVorlage();
+              SL.ui.downloadFile('netzwerkgeraete-vorlage.csv', csv, 'text/csv;charset=utf-8');
             } catch (e) { toast(e.message || 'Die Vorlage ließ sich nicht laden.', 4500); }
           },
         }, '⤓ Beispieldatei herunterladen'),
@@ -199,7 +209,7 @@
         importKnopf.disabled = true;
         importKnopf.textContent = 'Wird übernommen…';
         try {
-          const antwort = await SL.api.komponentenImport(daten);
+          const antwort = await SL.api.netzImport(daten);
           zeigeErgebnis(ergebnisBox, antwort);
         } catch (e) {
           ergebnisBox.innerHTML = '';
@@ -225,7 +235,7 @@
   function zeigeErgebnis(box, antwort) {
     box.innerHTML = '';
     box.appendChild(el('p', { class: antwort.fehler ? 'muted' : 'hinweis-ok' },
-      `${antwort.angelegt} ${antwort.angelegt === 1 ? 'Komponente' : 'Komponenten'} angelegt`
+      `${antwort.angelegt} ${antwort.angelegt === 1 ? 'Gerät' : 'Geräte'} angelegt`
       + (antwort.fehler ? `, ${antwort.fehler} ${antwort.fehler === 1 ? 'Zeile' : 'Zeilen'} nicht übernommen.` : '.')));
 
     const fehler = antwort.ergebnisse.filter(e => !e.ok);
@@ -246,6 +256,21 @@
       ]));
     }
 
+    // Hinweise je Zeile: eine nicht erkannte Art und verworfene Felder sind
+    // kein Fehler — aber wer sie nicht sieht, sucht später vergeblich nach
+    // einem Wert, den er eingetragen zu haben glaubt.
+    const mitHinweis = antwort.ergebnisse.filter(e => e.ok && e.hinweise && e.hinweise.length);
+    if (mitHinweis.length) {
+      const liste = el('div', { class: 'liste' });
+      for (const e of mitHinweis) {
+        liste.appendChild(el('div', { class: 'eintrag' }, [
+          el('div', {}, [el('strong', {}, `Zeile ${e.zeile}: `), e.name || '']),
+          ...e.hinweise.map(h => el('div', { class: 'muted' }, h)),
+        ]));
+      }
+      box.appendChild(karte('Übernommen, mit Anmerkung', liste));
+    }
+
     // Doppelte IPs und Gerätenamen fallen beim Import besonders leicht an:
     // eine kopierte Zeile ist schnell übersehen.
     const mitKonflikt = antwort.ergebnisse.filter(e => e.ok && e.konflikte && e.konflikte.length);
@@ -254,15 +279,14 @@
       for (const e of mitKonflikt) {
         for (const k of e.konflikte) {
           liste.appendChild(el('div', { class: 'eintrag' }, [
-            el('div', {}, [el('strong', {}, `Zeile ${e.zeile}: `), `${k.feld} ${k.wert} steht auch bei ${k.komponenteName}`]),
-            el('div', { class: 'muted' }, k.demonstratorName || ''),
+            el('div', {}, [el('strong', {}, `Zeile ${e.zeile}: `), `${k.feld} ${k.wert} steht auch bei ${k.geraetName}`]),
           ]));
         }
       }
       box.appendChild(karte('Übernommen, aber doppelt vergeben', [
         el('p', { class: 'muted' }, 'Diese Angaben kommen mehrfach vor — im Profinet die häufigste Störungsursache.'),
         liste,
-        el('div', { class: 'btn-reihe' }, [el('a', { class: 'btn', href: '#/netz' }, 'Zur Netzübersicht')]),
+        el('div', { class: 'btn-reihe' }, [el('a', { class: 'btn', href: '#/netzwerk?ansicht=uebersicht' }, 'Zur Netzübersicht')]),
       ]));
     }
   }
