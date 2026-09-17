@@ -12,6 +12,8 @@
 //   defekte               — Gerät ist in Reparatur                 (Phase 4)
 //   inventuren            — Zähl-Läufe mit Soll/Ist                (Phase 5)
 //   bestellungen          — Beschaffung samt Wareneingang           (Phase 6)
+//   netzgeraete           — Netzangaben zu einem Homebox-Artikel
+//   komponenten           — ALT: Geräte unter einem Demonstrator (wird abgelöst)
 //   settings              — App-Einstellungen und Zugangsdaten
 //
 // Fachdaten liegen wie in den Schwesterprojekten als EIN JSON-Payload je Zeile.
@@ -105,6 +107,27 @@ db.exec(`
     last_modified TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_komponenten_modified ON komponenten(last_modified);
+
+  -- Netzwerkgeräte: was im Netz der Schule haengt.
+  --
+  -- ABGRENZUNG ZUR TABELLE komponenten: dort ist ein Geraet ein reiner
+  -- Eintrag UNTER einem Demonstrator und existiert in Homebox nicht. Hier ist
+  -- jedes Geraet ein EIGENER Homebox-Artikel (so mit Matthias entschieden,
+  -- 2026-09-17) und dieser Satz haengt nur die Netzangaben daran. Dadurch
+  -- greifen Wartung, Lagerort und Etikett ohne Zusatzbau -- der Preis ist ein
+  -- groesserer Bestand.
+  --
+  -- Die alte Tabelle bleibt unangetastet stehen, bis der Uebernahme-Assistent
+  -- gelaufen ist. Nichts wird still umgeschrieben.
+  --
+  -- ACHTUNG: wie bei den Komponenten steht im Payload auf Wunsch ein
+  -- Geraetepasswort im KLARTEXT. Siehe deploy/backup.sh.
+  CREATE TABLE IF NOT EXISTS netzgeraete (
+    id            TEXT PRIMARY KEY,
+    payload       TEXT NOT NULL,
+    last_modified TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_netzgeraete_modified ON netzgeraete(last_modified);
 
   -- Bestellungen mit ihren Positionen und dem Wareneingang.
   --
@@ -285,6 +308,7 @@ const ausleihenStore = makePayloadStore('ausleihen');
 const defekteStore = makePayloadStore('defekte');
 const inventurenStore = makePayloadStore('inventuren');
 const komponentenStore = makePayloadStore('komponenten');
+const netzgeraeteStore = makePayloadStore('netzgeraete');
 const bestellungenStore = makePayloadStore('bestellungen');
 
 module.exports = {
@@ -306,6 +330,8 @@ module.exports = {
   saveInventur: inventurenStore.save, deleteInventur: inventurenStore.delete,
   listKomponenten: komponentenStore.list, getKomponente: komponentenStore.get,
   saveKomponente: komponentenStore.save, deleteKomponente: komponentenStore.delete,
+  listNetzgeraete: netzgeraeteStore.list, getNetzgeraet: netzgeraeteStore.get,
+  saveNetzgeraet: netzgeraeteStore.save, deleteNetzgeraet: netzgeraeteStore.delete,
   listBestellungen: bestellungenStore.list, getBestellung: bestellungenStore.get,
   saveBestellung: bestellungenStore.save, deleteBestellung: bestellungenStore.delete,
 };

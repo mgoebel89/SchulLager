@@ -27,6 +27,17 @@
       // Eigener Tag, weil ein nacktes Board kein Demonstrator ist — aber
       // ebenfalls ausleihbar und mit eigenem Raum.
       netzgeraetMarke: 'Netzgerät',
+      // Netzwerkgeräte (Menüpunkt „Netzwerk"). JEDES ist ein eigener
+      // Homebox-Artikel — dadurch greifen Wartung, Lagerort und Etikett ohne
+      // Zusatzbau. Die Klasse hängt am Tag, weil sie in Homebox sichtbar sein
+      // soll; welche Felder ein Gerät hat, entscheidet sie.
+      //
+      // ACHTUNG, zwei verschiedene Dinge mit ähnlichem Namen: `netzgeraetMarke`
+      // oben markiert ein AUSLEIHBARES Einzelgerät unter „Geräte". Die drei
+      // Tags hier markieren Teilnehmer im Netz und erscheinen dort NICHT.
+      profinetMarke: 'Profinet-Teilnehmer',
+      roboterMarke: 'Roboter',
+      pcMarke: 'PC',
       // Beschaffung: ab welchem BRUTTO-Bestellwert die Schule mehrere Angebote
       // verlangt, und wie viele. Steht in den Einstellungen, weil eine
       // Vergabegrenze eine Verwaltungsvorgabe ist und keine Naturkonstante.
@@ -49,6 +60,9 @@
     // dann lieber auf die Voreinstellung zurückfallen.
     if (!String(out.demonstratorMarke || '').trim()) out.demonstratorMarke = d.demonstratorMarke;
     if (!String(out.netzgeraetMarke || '').trim()) out.netzgeraetMarke = d.netzgeraetMarke;
+    for (const f of ['profinetMarke', 'roboterMarke', 'pcMarke']) {
+      if (!String(out[f] || '').trim()) out[f] = d[f];
+    }
     // Eine Schwelle von 0 hieße „immer Angebote nötig", ein leerer Wert „nie".
     // Beides ist fast sicher ein Versehen, deshalb zurück auf die Vorgabe.
     if (!(Number(out.angebotSchwelle) > 0)) out.angebotSchwelle = d.angebotSchwelle;
@@ -83,6 +97,59 @@
   }
 
   const GERAET_LABEL = { demonstrator: 'Demonstrator', netzgeraet: 'Netzgerät' };
+
+  // --- Netzwerkgeräte -------------------------------------------------------
+  // Drei Klassen mit unterschiedlichen Feldern. Ein Roboter hängt im normalen
+  // Schulnetz und hat weder Profinet-Gerätenamen noch Steckplatz; ein PC hat
+  // nur Bezeichnung und IP. Wer alle Felder an alle Klassen gibt, bekommt eine
+  // Maske, in der 80 % leer bleiben — und niemand weiß, ob leer „unbekannt"
+  // oder „gibt es hier nicht" heißt.
+  const NETZ_KLASSEN = ['profinet', 'roboter', 'pc'];
+  const NETZ_LABEL = {
+    profinet: 'Profinet-Teilnehmer',
+    roboter: 'Roboter',
+    pc: 'PC',
+  };
+  // Feldreihenfolge = Reihenfolge in der Maske. Beim Profinet-Teilnehmer steht
+  // der Gerätename vorn: in Profinet ist NICHT die IP der führende Bezeichner,
+  // sondern der DCP-Name (NameOfStation).
+  const NETZ_FELDER = {
+    profinet: [
+      'profinetName', 'ip', 'subnetz', 'mac', 'hersteller', 'typ',
+      'bestellnummer', 'seriennummer', 'uuid', 'firmware', 'steckplatz',
+      'benutzername', 'passwort', 'notiz',
+    ],
+    roboter: [
+      'hersteller', 'typ', 'steuerungsName', 'seriennummer', 'ip', 'mac',
+      'firmware', 'hardwarestand', 'notiz',
+    ],
+    pc: ['ip', 'notiz'],
+  };
+  const NETZ_FELD_LABEL = {
+    profinetName: 'Profinet-Gerätename', ip: 'IP-Adresse', subnetz: 'Subnetz',
+    mac: 'MAC-Adresse', hersteller: 'Hersteller', typ: 'Typ',
+    bestellnummer: 'Bestellnummer', seriennummer: 'Seriennummer', uuid: 'UUID',
+    firmware: 'Firmwarestand', steckplatz: 'Steckplatz',
+    benutzername: 'Benutzer', passwort: 'Passwort', notiz: 'Bemerkung',
+    steuerungsName: 'Steuerungsname im Netz', hardwarestand: 'Hardwarestand',
+  };
+
+  function netzFelder(klasse) { return NETZ_FELDER[klasse] || NETZ_FELDER.profinet; }
+  function netzKlasseLabel(klasse) { return NETZ_LABEL[klasse] || klasse || ''; }
+
+  // Welcher Homebox-Tag gehört zu welcher Klasse?
+  function netzMarke(klasse, settings) {
+    const s = settings || {};
+    if (klasse === 'roboter') return s.roboterMarke;
+    if (klasse === 'pc') return s.pcMarke;
+    return s.profinetMarke;
+  }
+  function netzKlasseAusArtikel(artikel, settings) {
+    for (const k of NETZ_KLASSEN) {
+      if (istDemonstrator(artikel, netzMarke(k, settings))) return k;
+    }
+    return '';
+  }
 
   // Ausleihbar ist, was ein Gerät ist. Verbrauchsmaterial wird ausgegeben.
   function istGeraet(artikel, settings) { return !!geraeteArt(artikel, settings); }
@@ -305,6 +372,8 @@
     codeArt,
     LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
     istDemonstrator, geraeteArt, istGeraet, GERAET_LABEL,
+    NETZ_KLASSEN, NETZ_LABEL, NETZ_FELD_LABEL,
+    netzFelder, netzKlasseLabel, netzMarke, netzKlasseAusArtikel,
     summen, nachlassBetrag, angebotswert, angebotspflicht, istAnfrage,
   };
 })();

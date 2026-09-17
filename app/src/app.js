@@ -14,7 +14,7 @@
     { label: 'Lager', items: [
       { path: '/artikel', label: 'Artikel', icon: 'box' },
       { path: '/geraete', label: 'Geräte', icon: 'geraet' },
-      { path: '/netz', label: 'Netzübersicht', icon: 'netz', angemeldet: true },
+      { path: '/netzwerk', label: 'Netzwerk', icon: 'netz', angemeldet: true },
       { path: '/orte', label: 'Lagerorte', icon: 'pin' },
       { path: '/scannen', label: 'Scannen', icon: 'scan' },
       { path: '/nachbestellung', label: 'Nachbestellen', icon: 'cart', angemeldet: true },
@@ -203,7 +203,11 @@
     // Alter Weg: die Ansicht hieß erst „Demonstratoren". Lesezeichen und
     // gedruckte Etiketten sollen weiter funktionieren.
     if (path === '/demonstratoren') { location.replace('#/geraete'); return; }
-    if (path === '/netz') return SL.views.renderNetz(mount);
+    if (path === '/netzwerk') return SL.views.renderNetzwerk(mount, params);
+    if (path === '/netzuebernahme') return SL.views.renderNetzUebernahme(mount);
+    // Alter Weg: die Seite hiess „Netzuebersicht" und zeigte die Komponenten
+    // der Demonstratoren. Lesezeichen sollen weiter funktionieren.
+    if (path === '/netz') { location.replace('#/netzwerk?ansicht=uebersicht'); return; }
     if (path === '/import') return SL.views.renderImport(mount);
     if (path === '/inventur') return SL.views.renderInventur(mount, params);
     if (path === '/wartung') return SL.views.renderWartung(mount, params);

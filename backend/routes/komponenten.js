@@ -287,6 +287,14 @@ module.exports = function createKomponentenRouter(broadcast, homebox) {
     if (!daten.name) return res.status(400).json({ error: 'Bitte eine Bezeichnung angeben.' });
 
     const k = { ...alt, ...daten, lastModifiedAt: nowIso() };
+    // Vermerk des Uebernahme-Assistenten: dieser Eintrag ist als
+    // Netzwerkgeraet neu entstanden. Er wird NICHT geloescht -- ein Abbruch
+    // mitten im Lauf bleibt dadurch folgenlos, ein zweiter Lauf ueberspringt
+    // Erledigtes, und die Ausgangsdaten liegen noch da, falls etwas schiefging.
+    if (req.body && req.body.uebernommenAls !== undefined) {
+      k.uebernommenAls = String(req.body.uebernommenAls || '').trim();
+      k.uebernommenAm = k.uebernommenAls ? nowIso() : '';
+    }
     db.saveKomponente(k);
     broadcast({ type: 'komponente:save', komponente: k, origin: req.header('x-client-id') || '' });
     res.json({ komponente: k, konflikte: konflikteFinden(daten, k.id) });

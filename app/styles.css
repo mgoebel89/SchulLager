@@ -922,3 +922,11 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
 .wahl-neu-zeile[hidden] { display: none; }
 .wahl-neu-kopf .btn { white-space: nowrap; flex: 0 0 auto; }
 .wahl-neu-zeile .inp { flex: 1 1 auto; min-width: 0; }
+
+/* FALLE, zum zweiten Mal in diesem Projekt: jede eigene `display`-Regel
+   schlaegt das eingebaute [hidden] des Browsers. Ein `el(..., {hidden: true})`
+   blieb dadurch sichtbar (erst die Tag-Zeile im Paperless-Fenster, dann die
+   Warnung beim Entfernen eines Netzwerkgeraets). Deshalb hier EINMAL zentral,
+   ganz am Ende -- Media-Queries erhoehen die Spezifitaet nicht, es entscheidet
+   die Reihenfolge. */
+[hidden] { display: none !important; }

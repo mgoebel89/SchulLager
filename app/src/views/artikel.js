@@ -328,8 +328,20 @@
     // Netzangaben gibt es nur bei Geräten — ein Widerstand hat keine SPS.
     // Bei einem Netzgerät beschreiben sie das Gerät selbst, bei einem
     // Demonstrator seine Einbauten; die Karte heißt deshalb unterschiedlich.
-    if (istDemo && SL.store.darfBuchen()) {
-      behaelter.appendChild(await SL.views.komponentenKarte(a, neuLaden, art));
+    // Ist DIESER Artikel selbst ein Netzwerkgerät (Profinet-Teilnehmer, Roboter,
+    // PC)? Dann gehören seine Netzangaben hierher — und die Wartung greift, weil
+    // die Defektmeldung am Artikel hängt.
+    const netzKlasse = SL.models.netzKlasseAusArtikel(a, SL.store.state.settings);
+
+    if ((istDemo || netzKlasse) && SL.store.darfBuchen()) {
+      if (netzKlasse) behaelter.appendChild(await SL.views.netzAngabenKarte(a, neuLaden, netzKlasse));
+      // Am Demonstrator wird zugeordnet, nicht mehr innerhalb angelegt.
+      if (istDemo) behaelter.appendChild(await SL.views.netzwerkKarte(a, neuLaden));
+      // Die ALTE Komponentenliste erscheint nur noch, solange an diesem Gerät
+      // wirklich etwas darin liegt. So geht vor der Übernahme nichts verloren,
+      // und danach verschwindet sie von selbst.
+      const alteKarte = await SL.views.komponentenKarteWennVorhanden(a, neuLaden, art);
+      if (alteKarte) behaelter.appendChild(alteKarte);
       behaelter.appendChild(await defektHistorie(a));
       // Frisch angelegtes Netzgerät: die Eingabe gleich öffnen. Ohne das
       // müsste man nach dem Anlegen erst suchen, wofür man es angelegt hat.

@@ -293,6 +293,11 @@
 
     const marke = input({ value: s.demonstratorMarke || 'Demonstrator' });
     const netzMarke = input({ value: s.netzgeraetMarke || 'Netzgerät' });
+    // Die drei Klassen der Netzwerkgeräte. Eigene Tags, damit ein IO-Modul aus
+    // einem Trainer NICHT unter „Geräte" auftaucht und nicht verliehen wird.
+    const profinetMarke = input({ value: s.profinetMarke || 'Profinet-Teilnehmer' });
+    const roboterMarke = input({ value: s.roboterMarke || 'Roboter' });
+    const pcMarke = input({ value: s.pcMarke || 'PC' });
     // Vergabegrenze der Schule. Steht hier und nicht im Code: eine
     // Verwaltungsvorgabe ändert sich, ohne dass jemand die App neu ausrollt.
     const schwelle = input({ type: 'number', min: '0', step: '100', value: String(s.angebotSchwelle) });
@@ -310,6 +315,17 @@
         + 'beiden Tags lassen sich ausleihen und können Netzangaben tragen; alles andere gilt '
         + 'als Verbrauchsmaterial und wird ausgegeben. Die Tags entstehen beim Anlegen von '
         + 'selbst und lassen sich in Homebox auch vorhandenen Artikeln zuweisen.'),
+      el('h3', { class: 'abschnitt' }, 'Netzwerkgeräte'),
+      el('div', { class: 'form-grid' }, [
+        feld('Tag Profinet-Teilnehmer', profinetMarke),
+        feld('Tag Roboter', roboterMarke),
+        feld('Tag PC', pcMarke),
+      ]),
+      el('p', { class: 'muted' },
+        'Jedes Netzwerkgerät ist zugleich ein Artikel im Lager — nur deshalb lassen sich '
+        + 'Reparaturen in der Wartung dokumentieren. An diesen Tags erkennt die App, um welche '
+        + 'Art Gerät es sich handelt. Sie sind bewusst ANDERE als die beiden oben: was hier steht, '
+        + 'hängt im Netz, wird aber nicht verliehen und erscheint nicht unter „Geräte".'),
       el('h3', { class: 'abschnitt' }, 'Beschaffung'),
       el('div', { class: 'form-grid' }, [
         feld('Angebote nötig ab (€ brutto)', schwelle),
@@ -327,11 +343,14 @@
           class: 'btn btn-primary', type: 'button',
           onclick: async () => {
             // Ein leerer Tagname würde jeden Artikel zum Demonstrator machen.
-            if (!marke.value.trim() || !netzMarke.value.trim()) { toast('Bitte beide Tag-Namen angeben.'); return; }
-            if (marke.value.trim().toLowerCase() === netzMarke.value.trim().toLowerCase()) {
-              // Gleiche Tags hieße: die Unterscheidung gibt es nicht mehr, und
-              // jedes Netzgerät wäre plötzlich ein Demonstrator.
-              toast('Die beiden Tags müssen sich unterscheiden.'); return;
+            const tags = [marke, netzMarke, profinetMarke, roboterMarke, pcMarke].map(x => x.value.trim());
+            if (tags.some(t => !t)) { toast('Bitte alle Tag-Namen angeben.'); return; }
+            // Zwei gleiche Tags hießen: die Unterscheidung gibt es nicht mehr.
+            // Ein Profinet-Modul wäre plötzlich ein Demonstrator und stünde
+            // ausleihbar unter „Geräte".
+            const klein = tags.map(t => t.toLowerCase());
+            if (new Set(klein).size !== klein.length) {
+              toast('Die fünf Tag-Namen müssen sich alle voneinander unterscheiden.', 5000); return;
             }
             try {
               await SL.store.settingsSpeichern({
@@ -340,6 +359,9 @@
                 klassen: klassen.value.split('\n').map(z => z.trim()).filter(Boolean),
                 demonstratorMarke: marke.value.trim(),
                 netzgeraetMarke: netzMarke.value.trim(),
+                profinetMarke: profinetMarke.value.trim(),
+                roboterMarke: roboterMarke.value.trim(),
+                pcMarke: pcMarke.value.trim(),
                 angebotSchwelle: Number(schwelle.value) || 0,
                 angebotAnzahl: Number(anzahl.value) || 0,
                 mwstSatz: Number(mwst.value) || 0,

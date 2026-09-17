@@ -300,7 +300,23 @@
     ]);
   }
 
+  // Die Karte NUR zeigen, wenn an diesem Gerät noch alte Einträge liegen.
+  // Nach der Übernahme verschwindet sie damit von selbst — eine leere Karte aus
+  // einer abgelösten Struktur bliebe sonst ewig stehen und lüde zum
+  // Weiterbenutzen ein.
+  async function komponentenKarteWennVorhanden(demonstrator, neuLaden, art) {
+    let liste = [];
+    try { liste = await SL.api.listKomponenten(demonstrator.id); } catch (_) { return null; }
+    if (!liste.length) return null;
+    const k = await komponentenKarte(demonstrator, neuLaden, art);
+    k.insertBefore(el('p', { class: 'ampel ampel-bald' },
+      'Alte Struktur: diese Einträge existieren im Lager nicht. Unter „Netzwerk" lässt sich die '
+      + 'Übernahme starten — erst danach greift die Wartung für sie.'), k.children[1] || null);
+    return k;
+  }
+
   SL.views.komponentenKarte = komponentenKarte;
+  SL.views.komponentenKarteWennVorhanden = komponentenKarteWennVorhanden;
   // Von der Neuaufnahme aus: gleich nach dem Anlegen eines Netzgeräts.
   SL.views.komponenteAnlegen = (artikel, neuLaden) => dialog(artikel, null, neuLaden, true);
   SL.views.renderNetz = renderNetz;

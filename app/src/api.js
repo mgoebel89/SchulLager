@@ -118,6 +118,22 @@
   const komponenteLoeschen = (id) => jsonFetch(`/api/komponenten/${encodeURIComponent(id)}`, { method: 'DELETE' });
   const komponentenSpalten = () => jsonFetch('/api/komponenten/spalten');
 
+  // --- Netzwerkgeraete (jedes ist ein eigener Homebox-Artikel) ---
+  function listNetzgeraete({ klasse = '', demonstratorId = '' } = {}) {
+    const p = new URLSearchParams();
+    if (klasse) p.set('klasse', klasse);
+    if (demonstratorId) p.set('demonstratorId', demonstratorId);
+    return jsonFetch('/api/netzgeraete' + (p.toString() ? '?' + p.toString() : ''));
+  }
+  const netzwerkUebersicht = () => jsonFetch('/api/netzgeraete/netz');
+  const netzgeraet = (id) => jsonFetch(`/api/netzgeraete/${encodeURIComponent(id)}`);
+  const netzgeraetAnlegen = (g) => jsonFetch('/api/netzgeraete', { method: 'POST', body: g });
+  const netzgeraetSpeichern = (id, g) => jsonFetch(`/api/netzgeraete/${encodeURIComponent(id)}`, { method: 'PUT', body: g });
+  // `mitArtikel` loescht den Homebox-Artikel mit -- echter Datenverlust, daran
+  // haengt die Defekthistorie. Die Oberflaeche fragt vorher.
+  const netzgeraetLoeschen = (id, mitArtikel) =>
+    jsonFetch(`/api/netzgeraete/${encodeURIComponent(id)}${mitArtikel ? '?artikel=1' : ''}`, { method: 'DELETE' });
+
   // --- Inventur ---
   const listInventuren = () => jsonFetch('/api/inventur');
   const getInventur = (id) => jsonFetch(`/api/inventur/${encodeURIComponent(id)}`);
@@ -294,7 +310,8 @@
     lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerNachMarke, lagerFoto,
     lagerHersteller, ortAnlegen, markeAnlegen,
     listKomponenten, netzUebersicht, komponenteAnlegen, komponenteSpeichern, komponenteLoeschen,
-    komponentenSpalten, komponentenVorlage, komponentenImport,
+    komponentenSpalten,
+    listNetzgeraete, netzwerkUebersicht, netzgeraet, netzgeraetAnlegen, netzgeraetSpeichern, netzgeraetLoeschen, komponentenVorlage, komponentenImport,
     listInventuren, getInventur, inventurStarten, inventurZaehlen,
     inventurAbschliessen, inventurUebernehmen, inventurLoeschen,
     listBestellungen, getBestellung, bestellungAnlegen, bestellungSpeichern,

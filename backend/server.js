@@ -22,6 +22,7 @@ const createBenutzerRouter = require('./routes/benutzer');
 const createLagerRouter = require('./routes/lager');
 const createAusleiheRouter = require('./routes/ausleihe');
 const createKomponentenRouter = require('./routes/komponenten');
+const createNetzgeraeteRouter = require('./routes/netzgeraete');
 const createInventurRouter = require('./routes/inventur');
 const createBestellungenRouter = require('./routes/bestellungen');
 const createDokumenteRouter = require('./routes/dokumente');
@@ -74,6 +75,10 @@ app.use('/api/ausleihe', createAusleiheRouter(broadcast));
 // Der Komponenten-Router braucht Homebox, um beim CSV-Import Gerätenamen und
 // Kennungen in Artikel-IDs aufzulösen.
 app.use('/api/komponenten', createKomponentenRouter(broadcast, require('./homebox')));
+
+// --- Netzwerkgeraete (jedes ist ein eigener Homebox-Artikel) ---
+// Braucht Homebox zum Anlegen, Umtaggen und Loeschen der Artikel.
+app.use('/api/netzgeraete', createNetzgeraeteRouter(broadcast, require('./homebox')));
 
 // --- Inventur (Zähl-Läufe; schreibt erst beim Übernehmen nach Homebox) ---
 app.use('/api/inventur', createInventurRouter(broadcast, require('./homebox')));
