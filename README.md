@@ -330,7 +330,8 @@ gedruckt wird am Windows-PC aus P-touch.
 - **Spalten Lagerorte:** `Bezeichnung, Lagerort, QR`
 - `Tag` enthält alle Homebox-Tags außer den app-internen (Demonstrator,
   Netzgerät, Profinet, Roboter, PC), `Lagerort` den vollen Pfad
-  („R212 › Schrank 4 › Fach 2“).
+  („R212 / Schrank 4 / Fach 2“ — Schrägstrich, weil P-touch das „›“ der App
+  nicht darstellte).
 - **QR** ist `https://<SchulLager>/a/<Homebox-Asset-ID>`. Mit der Handykamera
   öffnet das den Artikel im SchulLager; der **Scanner der Homebox-App** verwirft
   den Host und springt zum Pfad `/a/000-123`, den Homebox selbst kennt, also

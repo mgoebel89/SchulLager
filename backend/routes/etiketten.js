@@ -78,7 +78,7 @@ function csvText(spalten, zeilen, trennerName) {
 
 // Windows-1252 für den Fall, dass P-touch UTF-8 nicht versteht. `latin1` aus
 // Node reicht NICHT: 0x80–0x9F sind in Windows-1252 belegt (€, „, ›, –), in
-// Latin-1 aber Steuerzeichen. Der Pfadtrenner › läge genau dort.
+// Latin-1 aber Steuerzeichen.
 const CP1252 = {
   0x20AC: 0x80, 0x201A: 0x82, 0x0192: 0x83, 0x201E: 0x84, 0x2026: 0x85, 0x2020: 0x86,
   0x2021: 0x87, 0x02C6: 0x88, 0x2030: 0x89, 0x0160: 0x8A, 0x2039: 0x8B, 0x0152: 0x8C,
@@ -210,7 +210,10 @@ module.exports = function createEtikettenRouter(broadcast, homebox) {
         teile.unshift(o.name);
         o = o.elternId ? ortNachId.get(o.elternId) : null;
       }
-      return teile.join(' › ');
+      // Schrägstrich statt „›" wie in der App: P-touch zeigte das Zeichen
+      // nicht richtig an (Rückmeldung Matthias, 2026-09-29). Ein ASCII-Zeichen
+      // übersteht jeden Zeichensatz und jede Schrift.
+      return teile.join(' / ');
     };
 
     let zeilen = [];
