@@ -4,6 +4,14 @@
   const mount = document.getElementById('app');
   const shell = document.getElementById('appShell');
 
+  // QR-Etiketten tragen `https://<host>/a/000-123` — einen PFAD, keinen Hash.
+  // Nur so versteht Homebox' eigener Scanner denselben Code (er verwirft den
+  // Host und springt zum Pfad). nginx liefert für diesen Pfad index.html aus
+  // (try_files), `<base href="/">` hält die Skripte an ihrem Platz, und hier
+  // wird daraus die Hash-Adresse der App — bevor der Router sie liest.
+  const etikettPfad = location.pathname.match(/^\/a\/([0-9-]+)\/?$/);
+  if (etikettPfad) history.replaceState(null, '', '/#/asset/' + etikettPfad[1]);
+
   // ---------- Navigation (neues Modul = ein Eintrag) ----------
   // `admin: true` blendet den Punkt für alle anderen aus. Das ist Kosmetik —
   // durchgesetzt werden die Rechte im Backend.
@@ -24,7 +32,7 @@
     { label: 'Ausgabe', items: [
       { path: '/ausleihe', label: 'Ausleihe', icon: 'hand', angemeldet: true },
       { path: '/wartung', label: 'Wartung', icon: 'werkzeug', angemeldet: true },
-      { path: '/etiketten', label: 'Etiketten', icon: 'tag' },
+      { path: '/etiketten', label: 'Etiketten', icon: 'tag', angemeldet: true },
     ] },
     { footer: true, items: [
       { path: '/benutzer', label: 'Benutzer', icon: 'user', admin: true },
@@ -219,12 +227,10 @@
 
     // Kurzwege aus den QR-Etiketten. Sie sind bewusst knapp: jedes Zeichen
     // mehr macht das aufgedruckte Muster feiner und schlechter lesbar.
-    if (path.startsWith('/a/') || path.startsWith('/o/')) return kurzweg(path);
+    if (path.startsWith('/a/') || path.startsWith('/o/')) return kurzweg(path.slice(3));
+    if (path.startsWith('/asset/')) return kurzweg(path.slice(7));
 
-    // Ab Phase 3/4. Bewusst als benannte Platzhalter und nicht als „Seite
-    // nicht gefunden": die Navigationspunkte stehen schon da, und ein
-    // Fehlertext dahinter sähe nach Defekt aus.
-    if (path === '/etiketten') return platzhalter('Etiketten', 'Etikettendruck kommt in einer späteren Ausbaustufe.');
+    if (path === '/etiketten') return SL.views.renderEtiketten(mount, params);
 
     return platzhalter('Seite nicht gefunden', 'Diese Adresse gibt es nicht.');
   }
@@ -233,13 +239,14 @@
   // die Adresse durch das eigentliche Ziel ersetzt. Solange das läuft, steht
   // eine Zwischenmeldung — sonst sieht man auf dem Handy einen Moment nichts
   // und tippt nach.
-  function kurzweg(path) {
-    const code = decodeURIComponent(path.slice(3));
+  function kurzweg(rest) {
+    const code = decodeURIComponent(rest);
+    const vorher = location.hash;
     mount.appendChild(SL.ui.karte(null, SL.ui.el('p', { class: 'muted' }, `Kennung ${code} wird nachgeschlagen…`)));
     SL.views.codeAufloesen(code).then(() => {
       // Blieb die Adresse stehen, wurde nichts gefunden — der Dialog aus
       // codeAufloesen erklärt es bereits; hier nur nicht hängen bleiben.
-      if (location.hash.startsWith('#/a/') || location.hash.startsWith('#/o/')) location.hash = '#/scannen';
+      if (location.hash === vorher) location.hash = '#/scannen';
     });
   }
 

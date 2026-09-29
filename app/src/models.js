@@ -44,6 +44,13 @@
       angebotSchwelle: 3000,
       angebotAnzahl: 3,
       mwstSatz: 19,
+      // Etiketten (Phase 3): Adresse, unter der das SchulLager DAUERHAFT
+      // erreichbar ist — sie wird in jeden QR-Code gedruckt. Trennzeichen und
+      // Kodierung der CSV sind einstellbar, weil erst der Test am echten
+      // P-touch zeigt, was die Vorlage versteht.
+      etikettAdresse: '',
+      etikettTrenner: 'komma',      // komma | semikolon | tab
+      etikettKodierung: 'utf8bom',  // utf8bom | cp1252
       schemaVersion: 1,
     };
   }
@@ -200,11 +207,25 @@
   // Vier Sorten kommen im Schullager vor:
   //   artikel     eigenes QR-Etikett  → .../#/a/A-1042  oder  bloß "A-1042"
   //   ort         Etikett am Fach     → .../#/o/O-17    oder  bloß "O-17"
+  //   asset       Etikett ab Phase 3 → https://<host>/a/000-123 (OHNE #),
+  //               genauso Homebox' eigene Etiketten; bloß "000-123" getippt.
+  //               Kann ein Artikel ODER ein Lagerort sein.
   //   homeboxId   von Homebox selbst gedrucktes Etikett (URL mit UUID)
   //   barcode     alles andere: Handelsware mit EAN/UPC
   const RE_ARTIKEL = /^A-\d+$/i;
   const RE_ORT = /^O-\d+$/i;
   const RE_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  const RE_ASSET_URL = /^https?:\/\/[^/?#\s]+\/a\/(\d{3,}-?\d+)\/?(?:[?#].*)?$/i;
+  const RE_ASSET = /^(\d{3}-\d{3,})$/;
+
+  // Asset-ID in Homebox' Schreibweise: sechs Stellen, Bindestrich nach der
+  // dritten („000-123"). Gegenstück zu assetNorm in backend/homebox.js.
+  function assetNorm(wert) {
+    const ziffern = String(wert || '').replace(/\D/g, '');
+    if (!ziffern || Number(ziffern) <= 0) return '';
+    const p = ziffern.replace(/^0+(?=\d{6})/, '').padStart(6, '0');
+    return `${p.slice(0, 3)}-${p.slice(3)}`;
+  }
 
   function codeArt(text) {
     const t = String(text || '').trim();
@@ -220,6 +241,11 @@
         wert: decodeURIComponent(eigen[2]).toUpperCase(),
       };
     }
+
+    // Asset-ID-Etikett. Steht VOR der UUID-Prüfung, ist aber mit ihr nicht zu
+    // verwechseln: eine Asset-ID hat nur Ziffern und einen Bindestrich.
+    const asset = t.match(RE_ASSET_URL) || t.match(RE_ASSET);
+    if (asset && assetNorm(asset[1])) return { art: 'asset', wert: assetNorm(asset[1]) };
 
     if (RE_ARTIKEL.test(t)) return { art: 'artikel', wert: t.toUpperCase() };
     if (RE_ORT.test(t)) return { art: 'ort', wert: t.toUpperCase() };
@@ -369,7 +395,7 @@
     ROLLEN, ROLLE_LABEL,
     defaultSettings, mergeSettingsDefaults,
     ortBaum, ortPfad,
-    codeArt,
+    codeArt, assetNorm,
     LEIHDAUER_TAGE, faelligVorschlag, dateToIso, heuteIso, leihStatus, tageZwischen,
     istDemonstrator, geraeteArt, istGeraet, GERAET_LABEL,
     NETZ_KLASSEN, NETZ_LABEL, NETZ_FELD_LABEL,

@@ -312,7 +312,22 @@ function normOrt(roh) {
     // Locations-API kennt keine benutzerdefinierten Felder — dort bleibt der
     // Wert leer, und der Ort wird über seine ID angesprochen.
     code: feldLesen(roh.fields, FELD_CODE),
+    // In der Entities-API ist ein Lagerort eine Entität wie jede andere und
+    // bekommt deshalb ebenfalls eine Asset-ID. Die alte Locations-API kennt
+    // keine — dort bleibt das Feld leer.
+    assetId: roh.assetId || roh.assetID || '',
   };
+}
+
+// Asset-ID in Homebox' eigene Schreibweise bringen: sechs Stellen, Bindestrich
+// nach der dritten („000-123", bei großen Nummern „123-4567"). So formatiert
+// Homebox sie selbst (repo/asset_id_type.go) — und so muss sie im QR stehen,
+// damit Homebox' Scanner und unsere Suche dieselbe Zeichenkette sehen.
+function assetNorm(wert) {
+  const ziffern = String(wert || '').replace(/\D/g, '');
+  if (!ziffern || Number(ziffern) <= 0) return '';
+  const p = ziffern.replace(/^0+(?=\d{6})/, '').padStart(6, '0');
+  return `${p.slice(0, 3)}-${p.slice(3)}`;
 }
 
 function listeAus(data) {
@@ -932,6 +947,82 @@ async function anhangHochladen(id, { daten, dateiname, mimetype, typ = 'photo' }
   return res.json().catch(() => ({ ok: true }));
 }
 
+// --- Asset-IDs (Etiketten) ------------------------------------------------
+// Das Etikett trägt `https://<SchulLager>/a/<Asset-ID>`. Warum die Asset-ID
+// und nicht unsere eigene Kurzkennung: Homebox' eigener Scanner verwirft den
+// Host einer gescannten Adresse und springt nur zum PFAD — `/a/000-123` ist in
+// Homebox eine gültige Seite (leitet auf den Artikel weiter). Ein Etikett
+// bedient so beide Oberflächen. Nachgesehen im Homebox-Quelltext
+// (ScannerModal.vue, pages/a/[id].vue), 2026-09-29.
+
+// Wer ist das? Artikel oder Lagerort — beide sind Entitäten mit Asset-ID.
+async function beiAsset(wert) {
+  const id = assetNorm(wert);
+  if (!id) return null;
+  const data = await api(`/api/v1/assets/${encodeURIComponent(id)}`, { params: { page: 1, pageSize: 5 } })
+    .catch(e => { if (e.status === 404 || e.status === 400) return null; throw e; });
+  const { eintraege } = listeAus(data);
+  if (!eintraege.length) return null;
+  const roh = eintraege[0];
+  // Ob es ein Ort ist, sagt die Ortsliste verlässlich; ein Merkmal in der
+  // Kurzfassung ist je nach Version da oder nicht.
+  const ort = (await orte().catch(() => [])).find(o => o.id === roh.id);
+  if (ort) return { typ: 'ort', ort };
+  return { typ: 'artikel', artikel: await holen(roh.id) };
+}
+
+// Fehlende Asset-IDs vergeben lassen — Homebox' eigene Aktion (in der
+// Oberfläche unter Werkzeuge). Sie nummeriert ALLE Entitäten ohne ID
+// fortlaufend weiter, nicht nur die gewünschten; so arbeitet Homebox, und
+// genau so ist es mit Matthias abgesprochen (2026-09-29).
+async function assetIdsSicherstellen() {
+  const erg = await api('/api/v1/actions/ensure-asset-ids', { method: 'POST' });
+  cacheVerwerfen();
+  return Number(erg && erg.completed) || 0;
+}
+
+// Artikelliste für die Etikettenauswahl: gefiltert nach Suchbegriff, Lagerort
+// (samt allen Unterorten) und Tag, aber ohne Seitenblättern — wer einen ganzen
+// Schrank anhaken will, muss ihn auch ganz sehen.
+//
+// Jeder Filter wird NACHGEPRÜFT: Homebox ignoriert unbekannte Parameter still,
+// und die Antwort sähe dann aus wie „alles passt". Tag und Ort lassen sich an
+// der Kurzfassung prüfen; tragen die Kurzfassungen die Angabe nicht, wird sie
+// nicht verworfen, sondern durchgelassen (lieber ein Artikel zu viel in der
+// Auswahl als ein stiller Verlust).
+async function etikettenArtikel({ q = '', ortIds = [], markeId = '' } = {}) {
+  const stil = await stilErmitteln();
+  const ortSet = new Set(ortIds);
+  const ortsIds = new Set((await orte().catch(() => [])).map(o => o.id));
+  const proSeite = 100;
+  const treffer = [];
+  let geprueft = 0;
+  let unvollstaendig = false;
+
+  for (let seite = 1; seite <= Math.ceil(MAX_DURCHGANG / proSeite); seite++) {
+    const params = stil === 'entities'
+      ? { q, page: seite, pageSize: proSeite, isLocation: false,
+          parentIds: ortIds.length ? ortIds : undefined, tags: markeId || undefined }
+      : { q, page: seite, pageSize: proSeite,
+          locations: ortIds.length ? ortIds : undefined, labels: markeId || undefined };
+    const { eintraege, gesamt } = listeAus(await api(artikelPfad(stil), { params }));
+    if (!eintraege.length) break;
+
+    for (const a of eintraege.map(normArtikel)) {
+      if (ortsIds.has(a.id)) continue;                              // Lagerort, kein Artikel
+      if (ortSet.size && a.ortId && !ortSet.has(a.ortId)) continue;  // Ortfilter wirkungslos
+      if (markeId && a.marken.length && !a.marken.some(m => m.id === markeId)) continue;
+      treffer.push(a);
+    }
+
+    geprueft += eintraege.length;
+    if (eintraege.length < proSeite || (gesamt && geprueft >= gesamt)) break;
+    if (geprueft >= MAX_DURCHGANG) { unvollstaendig = true; break; }
+  }
+  treffer.sort((a, b) => String(a.name).localeCompare(String(b.name), 'de'));
+  return { artikel: treffer, geprueft, unvollstaendig };
+}
+
 async function health() {
   await stilErmitteln();
   // Den Namen der aktiven Sammlung mitgeben — bei mehreren Beständen ist das
@@ -966,6 +1057,7 @@ module.exports = {
   anlegen, aktualisieren, bestandAendern,
   nachbestellung, anhangHochladen, nachMarke, lieferanten,
   markeSicherstellen, ortAnlegen, hersteller,
+  assetNorm, beiAsset, assetIdsSicherstellen, etikettenArtikel, detailsNachladen,
   // für Tests
   _normArtikel: normArtikel,
   _normOrt: normOrt,

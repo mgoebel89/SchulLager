@@ -930,3 +930,27 @@ a.eintrag-klick strong { color: var(--akzent-dunkel); }
    ganz am Ende -- Media-Queries erhoehen die Spezifitaet nicht, es entscheidet
    die Reihenfolge. */
 [hidden] { display: none !important; }
+
+/* Etiketten-Auswahl (Phase 3). Die ganze Zeile ist das Label der Checkbox —
+   auf dem Tablet trifft man sonst das 22-px-Kästchen nicht. Steht NACH den
+   Media-Queries, damit die Zeile auch schmal eine Zeile bleibt. */
+.etikett-zeile {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 4px; border-bottom: 1px solid #eef0f3; cursor: pointer;
+}
+.etikett-zeile:hover { background: var(--akzent-blass); }
+.etikett-zeile .chk { flex: 0 0 auto; margin-top: 1px; }
+.etikett-text { flex: 1 1 auto; min-width: 0; }
+.etikett-text .muted { margin: 2px 0 0; }
+.etikett-kopf { font-weight: 600; border-bottom: 2px solid var(--rand); }
+.etikett-filter { margin-bottom: 8px; }
+.etikett-filter .btn { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* Fuß klebt unten: bei 300 Artikeln soll man nicht zum Knopf scrollen müssen. */
+.etikett-fuss {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--flaeche); border: 1px solid var(--rand); border-radius: 10px;
+  padding: 10px 14px; margin-top: 12px; box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
+}
+.chip .chip-x { padding-left: 6px; }
+.ort-aktionen { margin-top: 0; justify-content: flex-end; }

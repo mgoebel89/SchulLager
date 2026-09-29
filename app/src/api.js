@@ -96,6 +96,23 @@
   const lagerArtikel = (id) => jsonFetch(`/api/lager/${encodeURIComponent(id)}`);
   const lagerBeiBarcode = (code) => jsonFetch(`/api/lager/barcode/${encodeURIComponent(code)}`);
   const lagerBeiCode = (code) => jsonFetch(`/api/lager/code/${encodeURIComponent(code)}`);
+  // Antwort: { typ: 'artikel', artikel } oder { typ: 'ort', ort }.
+  const lagerBeiAsset = (id) => jsonFetch(`/api/lager/asset/${encodeURIComponent(id)}`);
+
+  // Aus einem gedeuteten Scan (SL.models.codeArt) den Artikel holen — an EINER
+  // Stelle, damit Wareneingang, Inventur und Artikelwahl neue Etikettenarten
+  // nicht jede für sich lernen müssen. `null` heißt: das war ein Lagerort.
+  // Nicht gefunden wirft wie gewohnt einen ApiFehler mit Status 404.
+  async function artikelAusScan(art, wert) {
+    if (art === 'ort') return null;
+    if (art === 'homeboxId') return lagerArtikel(wert);
+    if (art === 'artikel') return lagerBeiCode(wert);
+    if (art === 'asset') {
+      const t = await lagerBeiAsset(wert);
+      return t.typ === 'ort' ? null : t.artikel;
+    }
+    return lagerBeiBarcode(wert);
+  }
   const lagerAnlegen = (a) => jsonFetch('/api/lager/', { method: 'POST', body: a });
   const lagerSpeichern = (id, a) => jsonFetch(`/api/lager/${encodeURIComponent(id)}`, { method: 'PUT', body: a });
   const lagerBestand = (id, arg) => jsonFetch(`/api/lager/${encodeURIComponent(id)}/bestand`, { method: 'POST', body: arg });
@@ -200,6 +217,21 @@
   const belegLoesen = (id, belegId) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/beleg/${encodeURIComponent(belegId)}`, { method: 'DELETE' });
   const rechnungZuordnen = (id, d) => jsonFetch(`/api/bestellungen/${encodeURIComponent(id)}/rechnung`, { method: 'POST', body: d });
   const lagerLieferanten = () => jsonFetch('/api/bestellungen/lieferanten');
+
+  // --- Etiketten (Merkliste + CSV für P-touch) ---
+  const listEtiketten = () => jsonFetch('/api/etiketten');
+  const etikettenSpalten = () => jsonFetch('/api/etiketten/spalten');
+  function etikettenArtikel({ q = '', ortId = '', markeId = '' } = {}) {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (ortId) p.set('ortId', ortId);
+    if (markeId) p.set('markeId', markeId);
+    return jsonFetch('/api/etiketten/artikel' + (p.toString() ? '?' + p.toString() : ''));
+  }
+  // eintraege: [{ id, typ: 'artikel'|'ort', name }]
+  const etikettVormerken = (eintraege) => jsonFetch('/api/etiketten/vormerken', { method: 'POST', body: { eintraege } });
+  const etikettEntmerken = (id) => jsonFetch(`/api/etiketten/vormerken/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const etikettenExport = (typ, ids) => jsonFetch('/api/etiketten/export', { method: 'POST', body: { typ, ids } });
 
   // --- Paperless (Belegablage) ---
   const paperlessConfig = () => jsonFetch('/api/dokumente/config');
@@ -318,6 +350,8 @@
     getSettings, putSettings,
     lagerConfig, putLagerConfig, lagerHealth, lagerSammlungen,
     lagerSuchen, lagerOrte, lagerOrt, lagerMarken, lagerArtikel, lagerBeiBarcode, lagerBeiCode,
+    lagerBeiAsset, artikelAusScan,
+    listEtiketten, etikettenSpalten, etikettenArtikel, etikettVormerken, etikettEntmerken, etikettenExport,
     lagerAnlegen, lagerSpeichern, lagerBestand, lagerNachbestellung, lagerNachMarke, lagerFoto,
     lagerHersteller, ortAnlegen, markeAnlegen,
     listKomponenten, netzUebersicht, komponenteAnlegen, komponenteSpeichern, komponenteLoeschen,

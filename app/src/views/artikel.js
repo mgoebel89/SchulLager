@@ -274,6 +274,7 @@
       ? el('div', { class: 'btn-reihe' }, [
         el('button', { class: 'btn btn-sm', type: 'button', onclick: () => bearbeitenDialog(a, neuLaden) }, 'Bearbeiten'),
         el('button', { class: 'btn btn-sm', type: 'button', onclick: () => umlagern(a, neuLaden) }, 'Umlagern'),
+        SL.ui.vormerkKnopf({ id: a.id, typ: 'artikel', name: a.name }, { klein: true }),
         // Ausleihen gibt es NUR für Demonstratoren (so entschieden): sonst
         // „leiht" jemand 200 Widerstände aus, die nie zurückkommen.
         // Verbrauchsmaterial wird stattdessen ausgegeben — das bucht den

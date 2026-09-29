@@ -39,8 +39,10 @@
 
     mount.appendChild(karte('Was sich scannen lässt', el('dl', { class: 'daten' }, [
       zeile('Handelsbarcode', 'EAN, UPC, Code 128 — führt zum Artikel, wenn der Code in Homebox hinterlegt ist.'),
-      zeile('Eigenes QR-Etikett', 'Öffnet Artikel (A-…) oder Lagerort (O-…) unmittelbar.'),
+      zeile('Eigenes QR-Etikett', 'Öffnet Artikel oder Lagerort unmittelbar — auch mit der normalen Handykamera. '
+        + 'Derselbe Code funktioniert im Scanner der Homebox-App.'),
       zeile('Homebox-Etikett', 'Von Homebox selbst gedruckte Etiketten werden ebenfalls erkannt.'),
+      zeile('Asset-ID', 'Die Nummer unter dem QR (z. B. 000-123) lässt sich auch eintippen.'),
     ])));
   }
 
@@ -61,6 +63,13 @@
     try {
       if (art === 'homeboxId') {
         location.hash = `#/artikel?id=${encodeURIComponent(wert)}`;
+        return;
+      }
+      if (art === 'asset') {
+        const t = await SL.api.lagerBeiAsset(wert);
+        location.hash = t.typ === 'ort'
+          ? `#/orte?id=${encodeURIComponent(t.ort.id)}`
+          : `#/artikel?id=${encodeURIComponent(t.artikel.id)}`;
         return;
       }
       if (art === 'artikel') {

@@ -23,8 +23,19 @@
         class: 'btn', type: 'button',
         onclick: () => SL.ui.scannen(async (text) => {
           const { art, wert } = SL.models.codeArt(text);
-          if (art !== 'ort') { toast('Das ist kein Lagerort-Etikett.', 3500); return; }
           const orte = await SL.store.orteLaden().catch(() => []);
+          // Ab Phase 3 tragen Orts-Etiketten die Homebox-Asset-ID — ob Ort oder
+          // Artikel, weiß erst Homebox.
+          if (art === 'asset') {
+            try {
+              const t = await SL.api.lagerBeiAsset(wert);
+              const o = t.typ === 'ort' ? (orte.find(x => x.id === t.ort.id) || t.ort) : null;
+              if (!o) { toast('Das ist ein Artikel-Etikett, kein Lagerort.', 3500); return; }
+              fertig(o);
+            } catch (e) { toast(e && e.status === 404 ? 'Unbekanntes Etikett.' : (e.message || 'Fehler'), 3500); }
+            return;
+          }
+          if (art !== 'ort') { toast('Das ist kein Lagerort-Etikett.', 3500); return; }
           const o = orte.find(x => String(x.code || '').toUpperCase() === wert);
           if (!o) { toast('Kein Lagerort mit dieser Kennung.', 3500); return; }
           fertig(o);

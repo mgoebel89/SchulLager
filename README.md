@@ -311,13 +311,41 @@ nichts: Löst man eine Verknüpfung, bleibt das Dokument erhalten.
 | Sorte | Beispiel | Wirkung |
 |---|---|---|
 | Handelsbarcode | `4001234567890` | Artikel über das Homebox-Feld `Barcode` |
-| Eigenes Artikel-Etikett | `A-1042` oder `https://…/#/a/A-1042` | Artikel über das Feld `Code` |
+| **Etikett ab Phase 3** | `https://<SchulLager>/a/000-123` oder getippt `000-123` | Artikel **oder** Lagerort über die Homebox-Asset-ID |
+| Altes Artikel-Etikett | `A-1042` oder `https://…/#/a/A-1042` | Artikel über das Feld `Code` |
 | Eigenes Ort-Etikett | `O-17` oder `https://…/#/o/O-17` | Lagerort mit Inhalt |
 | Homebox-Etikett | Adresse mit Artikel-UUID | Artikel direkt |
 
 Beim eigenen Etikett wird der **Host bewusst nicht geprüft**: die Schule
 erreicht denselben Container mal über die IP, mal über einen Namen — ein
 Hostvergleich würde eigene Etiketten verwerfen.
+
+### Etiketten drucken
+
+Die App druckt **nicht selbst**. Sie stellt unter „Etiketten“ eine CSV-Datei
+zusammen, die eine Vorlage in **P-touch Editor** als Datenbank einbindet;
+gedruckt wird am Windows-PC aus P-touch.
+
+- **Spalten Artikel:** `Bezeichnung, Hersteller, Tag, Lagerort, EAN, QR`
+- **Spalten Lagerorte:** `Bezeichnung, Lagerort, QR`
+- `Tag` enthält alle Homebox-Tags außer den app-internen (Demonstrator,
+  Netzgerät, Profinet, Roboter, PC), `Lagerort` den vollen Pfad
+  („R212 › Schrank 4 › Fach 2“).
+- **QR** ist `https://<SchulLager>/a/<Homebox-Asset-ID>`. Mit der Handykamera
+  öffnet das den Artikel im SchulLager; der **Scanner der Homebox-App** verwirft
+  den Host und springt zum Pfad `/a/000-123`, den Homebox selbst kennt, also
+  zum Homebox-Artikel. Ein Code, beide Oberflächen.
+- Die Adresse steht unter *Einstellungen → Etiketten* und wird auf **jedes**
+  Etikett gedruckt — nur eine dauerhaft feste IP oder einen festen Namen
+  eintragen.
+- Fehlt einem gewählten Eintrag die Asset-ID, lässt die App Homebox beim Export
+  die fehlenden vergeben (`ensure-asset-ids`, nummeriert **alle** Einträge ohne
+  ID).
+- Trennzeichen (Komma/Semikolon/Tab) und Zeichensatz (UTF-8 mit BOM oder
+  Windows-1252) sind einstellbar — was P-touch versteht, zeigt der erste Test.
+- Vormerken geht an Artikel, Lagerort und beim Einlagern; die Merkliste ist
+  gemeinsam und leert sich beim Export. „Zuletzt gedruckt“ heißt ehrlich
+  „zuletzt exportiert“.
 
 Stack und Designsprache folgen den Schwesterprojekten *Gemeindeverwaltung* und
 *ImkereiApp*, damit sich die Anwendungen gleich anfühlen und Bausteine
@@ -348,8 +376,10 @@ wandern können.
       3000-€-Grenze, Wareneingang gegen den Lieferschein (Kamera ODER
       Handscanner, unbekannte Codes werden angelernt), Einlagern-Liste nach
       Lagerort, Rechnung mit Preisnachtrag, Belegablage in Paperless.
-- [ ] Phase 3 — Etiketten (ans Ende geschoben; braucht die genauen
-      Brother-Modelle)
+- [x] **Phase 3 — Etiketten:** CSV-Export für P-touch-Editor-Vorlagen (Artikel
+      und Lagerorte), Auswahlliste mit Filtern, gemeinsame Merkliste,
+      „zuletzt gedruckt“, QR über die Homebox-Asset-ID für SchulLager und
+      Homebox zugleich.
 
 ## Hinweise für die Weiterentwicklung
 

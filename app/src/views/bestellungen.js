@@ -1293,9 +1293,9 @@
 
       let artikel = null;
       try {
-        if (art === 'homeboxId') artikel = await SL.api.lagerArtikel(wert);
-        else if (art === 'artikel') artikel = await SL.api.lagerBeiCode(wert);
-        else if (art === 'barcode') artikel = await SL.api.lagerBeiBarcode(wert);
+        artikel = await SL.api.artikelAusScan(art, wert);
+        // Ein Asset-Etikett kann auch an einem Lagerort kleben.
+        if (!artikel) { toast('Das ist ein Lagerort-Etikett, kein Artikel.', 3000); return; }
       } catch (e) {
         if (!(e && e.status === 404)) { toast(e.message || 'Nachschlagen fehlgeschlagen.', 4000); return; }
       }
@@ -1495,9 +1495,32 @@
       return a.localeCompare(b2, 'de');
     });
 
+    // Neuware braucht meist ein Etikett — beim Einlagern hat man sie in der
+    // Hand. Die Merkliste EINMAL fragen, nicht je Zeile.
+    let vorgemerkt = new Set();
+    try {
+      vorgemerkt = new Set((await SL.api.listEtiketten()).filter(e => e.vorgemerkt).map(e => e.id));
+    } catch (_) { /* dann eben ohne Vorbelegung */ }
+    const mitArtikel = offen.filter(p => p.artikelId);
+
     inhalt.innerHTML = '';
     inhalt.appendChild(el('p', { class: 'muted' }, 'Nach Lagerort sortiert — einmal den Weg abgehen und abhaken. '
       + 'Die Liste bleibt erhalten, wenn du zwischendurch unterbrochen wirst.'));
+    if (mitArtikel.length) {
+      inhalt.appendChild(el('div', { class: 'btn-reihe' }, [
+        el('button', {
+          class: 'btn btn-sm', type: 'button',
+          onclick: async (ev) => {
+            try {
+              await SL.api.etikettVormerken(mitArtikel.map(p => ({ id: p.artikelId, typ: 'artikel', name: p.artikelName })));
+              ev.target.disabled = true;
+              ev.target.textContent = '🏷 Alle vorgemerkt ✓';
+              toast(`${mitArtikel.length} Etiketten vorgemerkt — Druck unter „Etiketten".`, 3500);
+            } catch (e) { toast(e.message || 'Vormerken fehlgeschlagen.', 4000); }
+          },
+        }, '🏷 Etiketten für alle vormerken'),
+      ]));
+    }
 
     for (const name of namen) {
       inhalt.appendChild(el('h3', { class: 'abschnitt' }, name));
@@ -1531,6 +1554,10 @@
             el('div', { class: 'muted' }, `${p.geliefert} Stück geliefert`),
           ]),
           ortKnopf,
+          p.artikelId
+            ? SL.ui.vormerkKnopf({ id: p.artikelId, typ: 'artikel', name: p.artikelName },
+              { klein: true, vorgemerkt: vorgemerkt.has(p.artikelId) })
+            : null,
         ]);
         chk.addEventListener('change', async () => {
           try {

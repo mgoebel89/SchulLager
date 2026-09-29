@@ -17,6 +17,7 @@
       { id: 'homebox', label: 'Homebox', render: renderHomebox },
       { id: 'paperless', label: 'Paperless', render: renderPaperless },
       { id: 'allgemein', label: 'Allgemein', render: renderAllgemein },
+      { id: 'etiketten', label: 'Etiketten', render: renderEtiketten },
       { id: 'benutzer', label: 'Benutzer', render: renderBenutzerHinweis },
     ];
     const aktiv = kategorien.find(k => k.id === params.kat) || kategorien[0];
@@ -365,6 +366,72 @@
                 angebotSchwelle: Number(schwelle.value) || 0,
                 angebotAnzahl: Number(anzahl.value) || 0,
                 mwstSatz: Number(mwst.value) || 0,
+              });
+              toast('Gespeichert.');
+            } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }
+          },
+        }, 'Speichern'),
+      ]),
+    ]));
+  }
+
+  // --- Etiketten ------------------------------------------------------------
+  // Die App druckt nicht selbst, sie liefert eine CSV für eine Vorlage in
+  // P-touch Editor. Die Spalten sind fest (backend/routes/etiketten.js);
+  // einstellbar ist nur, was erst der Test am echten P-touch klärt.
+  async function renderEtiketten(mount) {
+    const s = SL.store.state.settings;
+    const adresse = input({ value: s.etikettAdresse || '', placeholder: '192.168.5.30', autocapitalize: 'none' });
+    let trenner = s.etikettTrenner || 'komma';
+    let kodierung = s.etikettKodierung || 'utf8bom';
+    const beispiel = el('p', { class: 'muted' });
+    const beispielZeigen = () => {
+      const a = adresse.value.trim().replace(/\/+$/, '');
+      beispiel.textContent = a
+        ? `So sieht ein QR-Inhalt aus: ${/^https?:\/\//i.test(a) ? a : 'https://' + a}/a/000-123`
+        : 'Noch keine Adresse — ohne sie lässt sich keine CSV erstellen.';
+    };
+    adresse.addEventListener('input', beispielZeigen);
+    beispielZeigen();
+
+    let spalten = null;
+    try { spalten = await SL.api.etikettenSpalten(); } catch (_) { /* nur Anzeige */ }
+
+    mount.appendChild(karte('Etiketten', [
+      el('p', { class: 'muted' }, 'Gedruckt wird in P-touch Editor: die Vorlage bindet die CSV aus „Etiketten" als Datenbank ein. '
+        + 'Der QR-Code führt mit der Handykamera ins SchulLager und im Scanner der Homebox-App zum Homebox-Artikel.'),
+      feld('Adresse des SchulLagers (feste IP oder Name, ggf. mit :Port)', adresse, { breit: true }),
+      beispiel,
+      el('p', { class: 'anmeldung-fehler' }, 'Diese Adresse steht auf jedem gedruckten Etikett. Ändert sie sich später, '
+        + 'führen die alten Etiketten ins Leere — bitte nur eine dauerhaft feste Adresse eintragen.'),
+      el('h3', { class: 'abschnitt' }, 'CSV-Format'),
+      el('div', { class: 'form-grid' }, [
+        feld('Trennzeichen', select([
+          { wert: 'komma', label: 'Komma ( , )' },
+          { wert: 'semikolon', label: 'Semikolon ( ; )' },
+          { wert: 'tab', label: 'Tabulator' },
+        ], trenner, v => { trenner = v; }, { leerLabel: false })),
+        feld('Zeichensatz', select([
+          { wert: 'utf8bom', label: 'UTF-8 (mit BOM)' },
+          { wert: 'cp1252', label: 'Windows-1252 (ANSI)' },
+        ], kodierung, v => { kodierung = v; }, { leerLabel: false })),
+      ]),
+      el('p', { class: 'muted' }, 'Zeigt P-touch Umlaute falsch (Ã¤ statt ä), auf Windows-1252 umstellen. '
+        + 'Landet alles in einer Spalte, das Trennzeichen wechseln. Nach einer Änderung die Vorlage in P-touch neu mit der Datei verknüpfen.'),
+      spalten ? el('p', { class: 'muted' }, [
+        'Spalten Artikel: ', el('strong', {}, spalten.artikel.join(', ')),
+        ' · Spalten Lagerorte: ', el('strong', {}, spalten.ort.join(', ')),
+      ]) : null,
+      el('div', { class: 'btn-reihe' }, [
+        el('button', {
+          class: 'btn btn-primary', type: 'button',
+          onclick: async () => {
+            try {
+              await SL.store.settingsSpeichern({
+                ...SL.store.state.settings,
+                etikettAdresse: adresse.value.trim().replace(/\/+$/, ''),
+                etikettTrenner: trenner,
+                etikettKodierung: kodierung,
               });
               toast('Gespeichert.');
             } catch (e) { toast(e.message || 'Speichern fehlgeschlagen.'); }

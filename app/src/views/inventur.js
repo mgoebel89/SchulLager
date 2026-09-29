@@ -276,10 +276,7 @@
         onclick: () => SL.ui.scannen(async (text) => {
           const { art, wert } = SL.models.codeArt(text);
           try {
-            const a = art === 'homeboxId' ? await SL.api.lagerArtikel(wert)
-              : art === 'artikel' ? await SL.api.lagerBeiCode(wert)
-                : art === 'ort' ? null
-                  : await SL.api.lagerBeiBarcode(wert);
+            const a = await SL.api.artikelAusScan(art, wert);
             if (!a) { toast('Das ist ein Lagerort-Etikett — bitte einen Artikel scannen.', 3500); return; }
             einzelZaehlen(lauf, a);
           } catch (e) {

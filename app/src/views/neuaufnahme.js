@@ -93,6 +93,11 @@
         onclick: () => SL.ui.scannen((text) => {
           const { art, wert } = SL.models.codeArt(text);
           if (art === 'ort') { toast('Das ist ein Lagerort-Etikett.', 3500); return; }
+          // Eigene und Homebox-Etiketten sind kein Handelsbarcode — sie im
+          // Barcodefeld abzulegen hieße, den Artikel an sein eigenes Etikett zu binden.
+          if (art === 'asset' || art === 'artikel' || art === 'homeboxId') {
+            toast('Das ist ein Lager-Etikett, kein Barcode des Herstellers.', 3500); return;
+          }
           barcode.value = wert;
         }),
       }, '⌷ Scannen')

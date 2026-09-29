@@ -117,6 +117,14 @@ module.exports = function createLagerRouter() {
     res.json(a);
   }));
 
+  // Asset-ID aus dem QR-Etikett (`/a/000-123`). Kann ein Artikel ODER ein
+  // Lagerort sein — beide sind in Homebox Entitäten mit Asset-ID.
+  r.get('/asset/:id', fang(async (req, res) => {
+    const t = await homebox.beiAsset(req.params.id);
+    if (!t) return res.status(404).json({ error: 'Keine Asset-ID wie diese in Homebox.' });
+    res.json(t);
+  }));
+
   // --- Schreiben (angemeldet) ---------------------------------------------
   r.post('/', auth.requireAuth, fang(async (req, res) => res.json(await homebox.anlegen(req.body || {}))));
 

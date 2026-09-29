@@ -26,6 +26,7 @@ const createNetzgeraeteRouter = require('./routes/netzgeraete');
 const createInventurRouter = require('./routes/inventur');
 const createBestellungenRouter = require('./routes/bestellungen');
 const createDokumenteRouter = require('./routes/dokumente');
+const createEtikettenRouter = require('./routes/etiketten');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -90,6 +91,9 @@ app.use('/api/bestellungen', createBestellungenRouter(broadcast, require('./home
 
 // --- Dokumente in Paperless (Lieferscheine, Rechnungen) ---
 app.use('/api/dokumente', createDokumenteRouter());
+
+// --- Etiketten: Merkliste und CSV-Export für P-touch Editor ---
+app.use('/api/etiketten', createEtikettenRouter(broadcast, require('./homebox')));
 
 // --- App-Einstellungen ---
 // Lesen darf jeder Angemeldete (die Oberfläche braucht z. B. die Klassenliste),

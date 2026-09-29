@@ -213,11 +213,20 @@
   async function inhaltKarte(orte, ortId) {
     const pfad = SL.models.ortPfad(orte, ortId) || 'Lagerort';
     const box = el('div');
+    const o = orte.find(x => x.id === ortId);
     const k = karte(pfad, box, {
-      aktion: el('a', {
-        class: 'btn btn-sm',
-        href: `#/artikel?ortId=${encodeURIComponent(ortId)}`,
-      }, 'In der Suche öffnen'),
+      aktion: el('div', { class: 'btn-reihe ort-aktionen' }, [
+        el('a', {
+          class: 'btn btn-sm',
+          href: `#/artikel?ortId=${encodeURIComponent(ortId)}`,
+        }, 'In der Suche öffnen'),
+        // Etikett für das Fach selbst …
+        SL.ui.vormerkKnopf({ id: ortId, typ: 'ort', name: o ? o.name : pfad }, { klein: true }),
+        // … und für alles, was darin liegt (Etikettenseite, auf diesen Ort gefiltert).
+        SL.store.darfBuchen()
+          ? el('a', { class: 'btn btn-sm', href: `#/etiketten?ortId=${encodeURIComponent(ortId)}` }, 'Etiketten für den Inhalt')
+          : null,
+      ]),
     });
     box.appendChild(el('p', { class: 'muted' }, 'Inhalt wird geladen…'));
     try {

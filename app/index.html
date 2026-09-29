@@ -2,6 +2,9 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
+  <!-- Relative Pfade immer ab der Wurzel auflösen: QR-Etiketten öffnen die App
+       unter /a/000-123, und dort fände der Browser sonst /a/styles.css. -->
+  <base href="/" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#2c5282" />
   <title>Lagerverwaltung</title>
@@ -70,6 +73,7 @@
   <script src="src/views/ausleihe.js"></script>
   <script src="src/views/benutzer.js"></script>
   <script src="src/views/einstellungen.js"></script>
+  <script src="src/views/etiketten.js"></script>
   <script src="src/app.js"></script>
 </body>
 </html>

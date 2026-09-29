@@ -12,6 +12,7 @@
 //   defekte               — Gerät ist in Reparatur                 (Phase 4)
 //   inventuren            — Zähl-Läufe mit Soll/Ist                (Phase 5)
 //   bestellungen          — Beschaffung samt Wareneingang           (Phase 6)
+//   etiketten             — Merkliste + zuletzt exportiert          (Phase 3)
 //   netzgeraete           — Netzangaben zu einem Homebox-Artikel
 //   komponenten           — ALT: Geräte unter einem Demonstrator (wird abgelöst)
 //   settings              — App-Einstellungen und Zugangsdaten
@@ -145,6 +146,21 @@ db.exec(`
     last_modified TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_bestellungen_modified ON bestellungen(last_modified);
+
+  -- Etiketten: Merkliste und „zuletzt gedruckt".
+  --
+  -- Die id IST die Homebox-ID des Artikels bzw. Lagerorts — je Gegenstand
+  -- genau ein Satz. Gedruckt wird NICHT von hier: die App liefert eine CSV,
+  -- die eine P-touch-Editor-Vorlage als Datenbank einbindet. „Gedruckt" heißt
+  -- deshalb genau genommen „exportiert"; mehr kann die App nicht wissen.
+  --
+  -- Der Name wird mitgeschrieben, damit die Merkliste lesbar bleibt, wenn
+  -- Homebox gerade nicht antwortet.
+  CREATE TABLE IF NOT EXISTS etiketten (
+    id            TEXT PRIMARY KEY,
+    payload       TEXT NOT NULL,
+    last_modified TEXT NOT NULL
+  );
 `);
 
 function nowIso() { return new Date().toISOString(); }
@@ -310,6 +326,7 @@ const inventurenStore = makePayloadStore('inventuren');
 const komponentenStore = makePayloadStore('komponenten');
 const netzgeraeteStore = makePayloadStore('netzgeraete');
 const bestellungenStore = makePayloadStore('bestellungen');
+const etikettenStore = makePayloadStore('etiketten');
 
 module.exports = {
   DATA_DIR, ATTACH_DIR,
@@ -334,4 +351,6 @@ module.exports = {
   saveNetzgeraet: netzgeraeteStore.save, deleteNetzgeraet: netzgeraeteStore.delete,
   listBestellungen: bestellungenStore.list, getBestellung: bestellungenStore.get,
   saveBestellung: bestellungenStore.save, deleteBestellung: bestellungenStore.delete,
+  listEtiketten: etikettenStore.list, getEtikett: etikettenStore.get,
+  saveEtikett: etikettenStore.save,
 };

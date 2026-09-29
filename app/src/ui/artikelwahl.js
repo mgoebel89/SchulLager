@@ -21,9 +21,8 @@
           const { art, wert } = SL.models.codeArt(text);
           if (art === 'ort') { toast('Das ist ein Lagerort-Etikett.', 3500); return; }
           try {
-            const a = art === 'homeboxId' ? await SL.api.lagerArtikel(wert)
-              : art === 'artikel' ? await SL.api.lagerBeiCode(wert)
-                : await SL.api.lagerBeiBarcode(wert);
+            const a = await SL.api.artikelAusScan(art, wert);
+            if (!a) { toast('Das ist ein Lagerort-Etikett.', 3500); return; }
             fertig(a);
           } catch (e) {
             toast(e && e.status === 404 ? 'Zu diesem Code ist kein Artikel hinterlegt.' : (e.message || 'Fehler'), 4000);
